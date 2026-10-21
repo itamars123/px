@@ -332,6 +332,18 @@ a { color: inherit; }
 .btn-blue { background: rgba(103, 193, 245, .2); color: var(--accent); }
 .btn-blue:hover { background: var(--accent); color: #fff; }
 
+.he-box {
+    grid-column: 1 / -1;
+    background: rgba(0, 56, 184, .18);
+    border-right: 4px solid #3d7bff;
+    padding: 16px;
+    border-radius: 4px;
+}
+.he-box h4 { margin: 0 0 6px; color: #fff; font-size: 17px; }
+.he-box p { margin: 6px 0; line-height: 1.6; }
+.he-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.small { font-size: 12px; }
+
 /* ---------- עגלה ---------- */
 .cart {
     position: fixed;

@@ -67,6 +67,15 @@ function storeUrl(game) {
   return `https://store.steampowered.com/app/${game.id}/?l=hebrew`;
 }
 
+// חיפוש תרגום קהילתי לעברית בסדנת Steam של המשחק
+function workshopHebrewUrl(game) {
+  return `https://steamcommunity.com/workshop/browse/?appid=${game.id}&searchtext=Hebrew&browsesort=textsearch`;
+}
+
+function webHebrewUrl(game) {
+  return `https://www.google.com/search?q=${encodeURIComponent(`${game.en} תרגום לעברית מוד`)}`;
+}
+
 // צבע קבוע לכל משחק לתמונה החלופית
 function hue(id) {
   return (id * 47) % 360;
@@ -210,7 +219,7 @@ function openGame(id) {
         <span class="k">שנת יציאה</span><span class="v">${game.year}</span>
         <span class="k">מפתח</span><span class="v">${escapeHtml(game.dev)}</span>
         <span class="k">ז'אנרים</span><span class="v">${game.genres.map((g) => GENRES[g]).join(", ")}</span>
-        <span class="k">שפה</span><span class="v">עברית (מוד) ✓</span>
+        <span class="k">שפה</span><span class="v">דף החנות: עברית (מוד) ✓</span>
         <span class="k">Steam</span><span class="v"><a href="${storeUrl(game)}" target="_blank" rel="noopener">לדף המשחק ↗</a></span>
       </div>
       <div class="buy-box">
@@ -223,6 +232,15 @@ function openGame(id) {
           <button class="btn btn-blue" data-wish="${id}">${wished ? "♥ ברשימת המשאלות" : "♡ הוסף לרשימת המשאלות"}</button>
           <a class="btn btn-blue" href="${storeUrl(game)}" target="_blank" rel="noopener">פתח ב-Steam</a>
         </div>
+      </div>
+      <div class="he-box">
+        <h4>🇮🇱 עברית בתוך המשחק</h4>
+        <p>המוד מתרגם את דף החנות. כדי לשחק בעברית בתוך המשחק עצמו צריך מוד תרגום של הקהילה, אם קיים כזה.</p>
+        <div class="he-actions">
+          <a class="btn btn-green" href="${workshopHebrewUrl(game)}" target="_blank" rel="noopener">חפש תרגום לעברית בסדנת Steam</a>
+          <a class="btn btn-blue" href="${webHebrewUrl(game)}" target="_blank" rel="noopener">חפש תרגום ברשת</a>
+        </div>
+        <p class="muted small">שימו לב: חלק מהמשחקים אינם תומכים בסדנה, ובמשחקים רבים טקסט עברי עלול להופיע הפוך משמאל לימין.</p>
       </div>
     </div>`;
   $("#modal").classList.remove("hidden");
