@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>החיים</title>
+<style>
+  @font-face { font-family: "Frank Ruhl Libre"; src: url(fonts/FrankRuhlLibre.ttf); font-weight: 300 900; }
+  @font-face { font-family: "Heebo"; src: url(fonts/Heebo.ttf); font-weight: 100 900; }
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: auto; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+  // Load the shared timeline, then the scenes. With ?play the film plays in real time.
+  fetch('timeline.json').then(r => r.json()).then(async tl => {
+    window.TIMELINE = tl;
+    await Promise.all([
+      document.fonts.load('500 66px "Frank Ruhl Libre"'),
+      document.fonts.load('700 220px "Frank Ruhl Libre"'),
+      document.fonts.load('300 54px "Heebo"')
+    ]);
+    const s = document.createElement('script');
+    s.src = 'scenes.js';
+    s.onload = () => {
+      const ctx = document.getElementById('c').getContext('2d');
+      window.draw = t => window.renderFrame(ctx, t);
+      window.READY = true;
+      if (location.search.includes('play')) {
+        const t0 = performance.now();
+        const loop = () => { draw(((performance.now() - t0) / 1000) % tl.duration); requestAnimationFrame(loop); };
+        loop();
+      }
+    };
+    document.body.appendChild(s);
+  });
+</script>
+</body>
+</html>
