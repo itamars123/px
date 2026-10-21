@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מתרגם מסך לעברית – סטים בעברית</title>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+    <div class="topbar-inner">
+        <a class="logo" href="index.html">
+            <span class="logo-icon">◉</span>
+            <span class="logo-text">סטים</span>
+            <span class="mod-badge">מוד עברית</span>
+        </a>
+        <nav class="main-nav">
+            <a href="index.html">← חזרה לחנות</a>
+            <a href="#" class="active">מתרגם מסך</a>
+        </nav>
+    </div>
+</header>
+
+<main class="page">
+    <h2 class="section-title">🇮🇱 מתרגם מסך לעברית – לכל המשחקים</h2>
+    <div class="about">
+        <p>תוכנה קטנה למחשב שמתרגמת לעברית את הטקסט של <strong>כל משחק</strong>: היא מזהה את הטקסט באנגלית במסך ומציגה את התרגום בחלון שקוף מעל המשחק.</p>
+
+        <div class="he-actions">
+            <a class="btn btn-green" href="translator/he_translator.py" download>הורד את המתרגם</a>
+            <a class="btn btn-blue" href="translator/requirements.txt" download>requirements.txt</a>
+            <a class="btn btn-blue" href="translator/run.bat" download>run.bat</a>
+        </div>
+        <p class="muted small">שמרו את שלושת הקבצים באותה תיקייה.</p>
+
+        <h3>התקנה (Windows, פעם אחת)</h3>
+        <ol>
+            <li>התקינו <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">Python</a>. בהתקנה סמנו את <strong>Add Python to PATH</strong>.</li>
+            <li>התקינו את <a href="https://github.com/UB-Mannheim/tesseract/wiki" target="_blank" rel="noopener">Tesseract OCR</a> לתיקיית ברירת המחדל. זה המנוע שמזהה את הטקסט במסך.</li>
+            <li>לחצו פעמיים על <code>run.bat</code>. בפעם הראשונה הוא יתקין את מה שצריך ויפעיל את המתרגם.</li>
+        </ol>
+
+        <h3>שימוש</h3>
+        <ol>
+            <li>הפעילו את המשחק במצב <strong>חלון ללא מסגרת</strong> (Borderless / Windowed Fullscreen), כדי שחלון התרגום יופיע מעליו.</li>
+            <li>גררו מלבן סביב האזור שבו מופיע הטקסט במשחק, למשל תיבת הדיאלוג או הכתוביות.</li>
+            <li>התרגום יופיע מתחת לאזור ויתעדכן לבד בכל פעם שהטקסט משתנה. אפשר לגרור את חלון התרגום לכל מקום.</li>
+        </ol>
+        <p><strong>מקשים:</strong> F8 השהה/המשך · F9 בחירת אזור חדש · F10 יציאה</p>
+
+        <h3>חשוב לדעת</h3>
+        <ul>
+            <li>זה תרגום אוטומטי (Google Translate), ולכן הוא לא מושלם. לתרגום מלא ואמיתי בתוך המשחק צריך מוד תרגום של הקהילה, אם קיים.</li>
+            <li>צריך חיבור לאינטרנט בשביל התרגום.</li>
+            <li>זיהוי הטקסט עובד הכי טוב על טקסט ברור על רקע אחיד. גופנים מעוצבים מאוד עלולים להיות מזוהים פחות טוב.</li>
+            <li>התוכנה רק מצלמת את המסך: היא לא משנה את קבצי המשחק ולא נכנסת לזיכרון שלו.</li>
+            <li>ספריית המקשים (keyboard) עלולה לדרוש הפעלה כמנהל כדי שהמקשים יעבדו בזמן שהמשחק פתוח. בלעדיה אפשר להשתמש בכפתורים שבחלון.</li>
+        </ul>
+    </div>
+</main>
+
+<footer class="footer">
+    מוד מעריצים לא רשמי · נבנה באהבה לגיימרים בישראל 🇮🇱
+</footer>
+</body>
+</html>

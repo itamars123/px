@@ -235,9 +235,10 @@ function openGame(id) {
       </div>
       <div class="he-box">
         <h4>🇮🇱 עברית בתוך המשחק</h4>
-        <p>המוד מתרגם את דף החנות. כדי לשחק בעברית בתוך המשחק עצמו צריך מוד תרגום של הקהילה, אם קיים כזה.</p>
+        <p>המוד מתרגם את דף החנות. כדי לשחק בעברית בתוך המשחק אפשר להשתמש במתרגם המסך שלנו, שעובד על כל משחק, או לחפש מוד תרגום של הקהילה.</p>
         <div class="he-actions">
-          <a class="btn btn-green" href="${workshopHebrewUrl(game)}" target="_blank" rel="noopener">חפש תרגום לעברית בסדנת Steam</a>
+          <a class="btn btn-green" href="translator.html">מתרגם מסך לעברית (כל המשחקים)</a>
+          <a class="btn btn-blue" href="${workshopHebrewUrl(game)}" target="_blank" rel="noopener">חפש תרגום לעברית בסדנת Steam</a>
           <a class="btn btn-blue" href="${webHebrewUrl(game)}" target="_blank" rel="noopener">חפש תרגום ברשת</a>
         </div>
         <p class="muted small">שימו לב: חלק מהמשחקים אינם תומכים בסדנה, ובמשחקים רבים טקסט עברי עלול להופיע הפוך משמאל לימין.</p>

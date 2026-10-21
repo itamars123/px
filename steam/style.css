@@ -401,3 +401,7 @@ a { color: inherit; }
     .game-detail { grid-template-columns: 1fr; }
     .grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
 }
+
+.about h3 { color: #fff; margin: 22px 0 6px; }
+.about a:not(.btn) { color: var(--accent); }
+.about code { background: rgba(0, 0, 0, .4); padding: 1px 6px; border-radius: 3px; }
