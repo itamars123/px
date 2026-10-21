@@ -1,158 +1,367 @@
-* {
-    box-sizing: border-box;
+/* מועדון מרוצים בשעת שקיעה: ירוק כהה של מסלול, קרם של כרטיסי הימור, זהב של גביע */
+:root {
+    --bg: #0e1d15;
+    --panel: #142a1e;
+    --panel-2: #1b3627;
+    --line: #2c4b38;
+    --fg: #f3ead6;
+    --muted: #a3b5a2;
+    --gold: #e2b54d;
+    --gold-ink: #2a1e05;
+    --red: #ef5a5f;
+    --ok: #5fd68a;
+    --display: "Secular One", "Heebo", "Arial Hebrew", Arial, sans-serif;
+    --body: "Heebo", "Arial Hebrew", Arial, sans-serif;
+    color-scheme: dark;
 }
 
-body {
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html, body {
     margin: 0;
-    font-family: Arial, sans-serif;
-    background: #e8f5e9;
-    color: #1b3a1f;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--body);
+    font-size: 15px;
 }
 
-main {
-    max-width: 800px;
+#app {
+    max-width: 1000px;
     margin: 0 auto;
-    padding: 16px;
+    padding-block: 14px 28px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+button { font-family: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, summary:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+/* ---------- כותרת ---------- */
+#topbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.brand { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.brand-mark {
+    font-family: var(--display);
+    font-size: clamp(26px, 5vw, 38px);
+    line-height: 1;
+    color: var(--gold);
+    letter-spacing: .5px;
+}
+.brand-sub { color: var(--muted); font-size: 13px; letter-spacing: 1px; }
+.purse {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 14px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel);
+}
+.purse-label { font-size: 11px; color: var(--muted); letter-spacing: 1px; }
+.purse-value {
+    font-family: var(--display);
+    font-size: 24px;
+    color: var(--gold);
+    font-variant-numeric: tabular-nums;
+}
+.purse-value.bump { animation: bump .5s ease; }
+@keyframes bump { 40% { transform: scale(1.25); } }
+.icon-btn {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    font-size: 18px;
+}
+
+/* ---------- במה ---------- */
+#stage {
+    position: relative;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: #2c4a7a;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+}
+#scene { display: block; width: 100%; }
+
+#hud {
+    position: absolute;
+    top: 34px;
+    right: 10px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.hud-chip {
+    display: flex;
+    flex-direction: column;
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: rgba(10, 22, 15, .72);
+    backdrop-filter: blur(4px);
+    min-width: 70px;
+}
+.hud-k { font-size: 10px; color: var(--muted); letter-spacing: 1px; }
+.hud-chip b { font-size: 16px; font-variant-numeric: tabular-nums; }
+
+#ticker {
+    position: absolute;
+    left: 10px; right: 10px; bottom: 10px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: rgba(10, 22, 15, .78);
+    font-weight: 700;
+    font-size: 15px;
     text-align: center;
 }
+#ticker-text { display: inline-block; }
+#ticker-text.in { animation: tick-in .35s ease; }
+@keyframes tick-in { from { opacity: 0; transform: translateY(6px); } }
 
-h1 {
-    margin: 8px 0 16px;
+#big {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-family: var(--display);
+    font-size: clamp(56px, 14vw, 120px);
+    color: var(--gold);
+    text-shadow: 0 4px 0 var(--gold-ink), 0 0 30px rgba(0, 0, 0, .5);
+    pointer-events: none;
 }
+#big.pop { animation: pop .7s ease; }
+@keyframes pop { from { transform: scale(1.8); opacity: 0; } 40% { opacity: 1; } }
 
-#stats {
+#flash {
+    position: absolute;
+    inset: 0;
+    background: #fff;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .6s ease;
+}
+#flash.on { opacity: .85; transition: none; }
+
+/* ---------- לוחות ---------- */
+.panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
     display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 16px;
-    font-size: 18px;
+    flex-direction: column;
+    gap: 14px;
 }
-
-#horse-picker {
+.row-head {
     display: flex;
-    justify-content: center;
+    align-items: center;
+    gap: 12px;
     flex-wrap: wrap;
-    gap: 8px;
-    margin: 12px 0;
 }
+h2, h3 { margin: 0; text-wrap: balance; }
+h2 { font-family: var(--display); font-weight: 400; font-size: 20px; }
+h3 { font-size: 12px; color: var(--muted); font-weight: 500; letter-spacing: 1px; }
+.hint, .muted { color: var(--muted); font-size: 13px; }
 
-.pick {
-    border: 3px solid transparent;
-    border-radius: 10px;
-    padding: 8px 12px;
-    font-size: 16px;
-    cursor: pointer;
-    color: white;
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tab {
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 14px;
 }
+.tab small { color: var(--muted); margin-inline-start: 6px; }
+.tab.on { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
+.tab.on small { color: var(--gold-ink); }
 
-.pick.selected {
-    border-color: #1b3a1f;
-    transform: scale(1.1);
+/* כרטיסי סוסים בסגנון תוכניית מרוצים */
+.cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
 }
-
-button {
-    font-size: 18px;
-    padding: 8px 18px;
-    border: none;
-    border-radius: 8px;
-    background: #2e7d32;
-    color: white;
-    cursor: pointer;
-}
-
-button:disabled {
-    opacity: 0.5;
-    cursor: default;
-}
-
-input {
-    width: 80px;
-    font-size: 16px;
-    padding: 4px;
-    margin: 0 8px;
-}
-
-#track {
-    margin: 20px 0;
-    border: 4px solid #6d4c41;
-    border-radius: 8px;
-    background: #8d6e63;
-}
-
-.lane {
+.card {
     position: relative;
-    height: 56px;
-    border-bottom: 2px dashed #d7ccc8;
+    text-align: right;
+    border: 2px solid var(--line);
+    background: var(--panel-2);
+    border-radius: 12px;
+    padding: 10px 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: transform .15s ease, border-color .15s ease;
 }
-
-.lane:last-child {
-    border-bottom: none;
-}
-
-/* קו הסיום בצד שמאל – הסוסים רצים מימין לשמאל */
-.lane::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 40px;
-    width: 6px;
-    background: repeating-linear-gradient(#fff 0 8px, #000 8px 16px);
-}
-
-.lane.mine {
-    background: rgba(255, 235, 59, 0.3);
-}
-
-.horse {
-    position: absolute;
-    top: 6px;
-    right: 0;
-    font-size: 38px;
-    line-height: 1;
-}
-
-.horse .tag {
-    position: absolute;
-    top: -2px;
-    right: -6px;
-    min-width: 18px;
-    border-radius: 50%;
-    font-size: 12px;
-    color: white;
-}
-
-#boost-area {
-    margin: 12px 0;
-}
-
-#boost {
-    background: #e65100;
-    font-size: 22px;
-}
-
-#stamina-bar {
-    width: 220px;
-    height: 12px;
-    margin: 8px auto;
+.card:hover { transform: translateY(-2px); }
+.card.on { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(226, 181, 77, .25); }
+.card-top { display: flex; align-items: center; gap: 8px; }
+.saddle {
+    width: 28px; height: 28px;
     border-radius: 6px;
-    background: #ccc;
+    display: grid; place-items: center;
+    font-weight: 900;
+    font-size: 15px;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
+    flex: none;
+}
+.card-name { font-family: var(--display); font-size: 19px; line-height: 1; }
+.card-odds {
+    margin-inline-start: auto;
+    font-family: var(--display);
+    font-size: 18px;
+    color: var(--gold);
+    font-variant-numeric: tabular-nums;
+}
+.card-strat { font-size: 12px; color: var(--muted); }
+.stat { display: grid; grid-template-columns: 52px 1fr; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.stat-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.stat-bar i { display: block; height: 100%; background: var(--fg); border-radius: 3px; }
+.form { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+
+.bet-box {
+    display: grid;
+    grid-template-columns: auto auto 1fr auto;
+    align-items: end;
+    gap: 14px 18px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--line);
+}
+.bet-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.seg, .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg button, .chips button {
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.seg button.on, .chips button.on { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.chips button:disabled { opacity: .35; cursor: default; }
+.payout b { font-family: var(--display); font-size: 24px; color: var(--gold); font-weight: 400; }
+
+.cta {
+    border: none;
+    border-radius: 10px;
+    padding: 12px 22px;
+    background: var(--gold);
+    color: var(--gold-ink);
+    font-family: var(--display);
+    font-size: 19px;
+    box-shadow: 0 3px 0 #8f6a1c;
+}
+.cta:active { transform: translateY(2px); box-shadow: 0 1px 0 #8f6a1c; }
+.cta:disabled { opacity: .5; cursor: default; }
+
+.msg { margin: 0; min-height: 1.2em; color: var(--red); font-weight: 700; }
+.howto summary { cursor: pointer; color: var(--muted); }
+.howto p { margin: 8px 0 0; line-height: 1.6; max-width: 65ch; }
+
+/* ---------- רכיבה ---------- */
+.ride-grid { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; }
+.meters { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.meter-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); letter-spacing: 1px; }
+#combo { color: var(--gold); font-weight: 700; }
+.bar { height: 12px; border-radius: 6px; background: var(--line); overflow: hidden; }
+#power { height: 100%; width: 100%; background: linear-gradient(to left, var(--gold), #f08a3c); border-radius: 6px; }
+#power.low { background: var(--red); }
+.rhythm {
+    position: relative;
+    height: 26px;
+    border-radius: 8px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
     overflow: hidden;
 }
+/* אזור הזהב: 74%–96% ממחזור הצעד, הסמן נע מימין לשמאל */
+.rhythm .zone {
+    position: absolute;
+    top: 0; bottom: 0;
+    right: 74%;
+    width: 22%;
+    background: rgba(226, 181, 77, .35);
+    border-inline: 2px solid var(--gold);
+}
+#marker {
+    position: absolute;
+    top: 3px; bottom: 3px;
+    right: 0;
+    width: 6px;
+    margin-right: -3px;
+    border-radius: 3px;
+    background: var(--fg);
+}
+.rhythm.hit { animation: hit .25s ease; }
+@keyframes hit { 50% { border-color: var(--gold); box-shadow: 0 0 12px var(--gold); } }
 
-#stamina {
-    width: 100%;
-    height: 100%;
-    background: #ff9800;
+.boost {
+    border: none;
+    border-radius: 16px;
+    padding: 16px 30px;
+    background: radial-gradient(circle at 50% 35%, #f6c860, #c7861e);
+    color: var(--gold-ink);
+    font-family: var(--display);
+    font-size: 26px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 5px 0 #7d5512;
+    touch-action: manipulation;
+}
+.boost small { font-family: var(--body); font-size: 11px; font-weight: 700; opacity: .7; }
+.boost:active, .boost.press { transform: translateY(3px); box-shadow: 0 2px 0 #7d5512; }
+
+/* ---------- תוצאות ---------- */
+.res-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+#res-title { font-size: 26px; }
+.res-money { font-family: var(--display); font-size: 26px; }
+.res-money.win { color: var(--ok); }
+.res-money.lose { color: var(--red); }
+.res-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.res-table th { text-align: right; font-size: 11px; color: var(--muted); font-weight: 500; letter-spacing: 1px; padding: 4px 6px; }
+.res-table td { padding: 8px 6px; border-top: 1px solid var(--line); }
+.res-table tr.me td { background: rgba(226, 181, 77, .12); }
+.res-table tr.me td:first-child { box-shadow: inset -3px 0 0 var(--gold); }
+.place-num { font-family: var(--display); font-size: 18px; }
+.res-horse { display: flex; align-items: center; gap: 8px; }
+.res-horse .saddle { width: 22px; height: 22px; font-size: 12px; }
+.res-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+.career {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+.career b { color: var(--fg); }
+
+@media (max-width: 640px) {
+    .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .bet-box { grid-template-columns: 1fr 1fr; }
+    .bet-box .payout { grid-column: 1 / -1; }
+    .bet-box .cta { grid-column: 1 / -1; }
+    .ride-grid { grid-template-columns: 1fr; }
+    .boost { width: 100%; padding: 20px; }
+    .hud-chip { min-width: 0; padding: 3px 8px; }
+    .hud-chip b { font-size: 14px; }
+    #ticker { font-size: 13px; }
 }
 
-#message {
-    font-size: 22px;
-    font-weight: bold;
-    min-height: 28px;
-}
-
-.hidden {
-    display: none !important;
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
 }
