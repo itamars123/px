@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מרוץ הסוסים</title>
+    <link rel="stylesheet" href="horses.css">
+</head>
+<body dir="rtl">
+    <main>
+        <h1>🏇 מרוץ הסוסים 🏇</h1>
+
+        <div id="stats">
+            <span>💰 מטבעות: <b id="coins">100</b></span>
+            <span>🏆 ניצחונות: <b id="wins">0</b></span>
+            <span>🏁 מרוצים: <b id="races">0</b></span>
+        </div>
+
+        <section id="setup">
+            <p>בחר סוס, הנח הימור ולחץ על "יאללה!"</p>
+            <div id="horse-picker"></div>
+            <label>
+                הימור:
+                <input type="number" id="bet" min="1" value="10">
+            </label>
+            <button id="start">יאללה! 🏁</button>
+        </section>
+
+        <section id="track"></section>
+
+        <div id="boost-area" class="hidden">
+            <button id="boost">🔥 דהירה! (רווח / לחיצה)</button>
+            <div id="stamina-bar"><div id="stamina"></div></div>
+            <small>כל לחיצה מאיצה את הסוס שלך – אבל הכוח נגמר!</small>
+        </div>
+
+        <p id="message"></p>
+        <button id="restart" class="hidden">משחק חדש 🔄</button>
+    </main>
+
+    <script src="horses.js"></script>
+</body>
+</html>
