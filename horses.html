@@ -17,6 +17,10 @@
             <span class="brand-sub">מסלול המרוצים הלאומי</span>
         </div>
         <div class="purse">
+            <span class="purse-label">גביעים</span>
+            <span id="trophy-count" class="purse-value">0</span>
+        </div>
+        <div class="purse">
             <span class="purse-label">ארנק</span>
             <span id="coins" class="purse-value">100</span>
         </div>
@@ -33,21 +37,88 @@
         <div id="ticker" hidden><span id="ticker-text"></span></div>
         <div id="big" hidden></div>
         <div id="flash"></div>
+        <div id="toasts"></div>
     </div>
 
-    <!-- לוח בחירה והימור -->
-    <section id="paddock" class="panel">
+    <nav id="modes" class="modes" role="tablist">
+        <button type="button" data-mode="career" class="on">הקריירה שלי</button>
+        <button type="button" data-mode="bet">הימורים מהירים</button>
+        <button type="button" data-mode="trophies">ארון הגביעים</button>
+    </nav>
+
+    <!-- קריירה: יצירת סוס -->
+    <section id="create" class="panel" hidden>
+        <div class="create-grid">
+            <div class="preview-box"><canvas id="preview-create" width="320" height="200"></canvas></div>
+            <div class="create-form">
+                <h2 id="create-title">הסוס הראשון שלך</h2>
+                <label class="field">
+                    <span>שם הסוס</span>
+                    <input id="horse-name" type="text" maxlength="12" placeholder="למשל: רוח מדבר" autocomplete="off">
+                </label>
+                <div class="field"><span>צבע פרווה</span><div id="sw-coat" class="swatches"></div></div>
+                <div class="field"><span>צבע חולצת הרוכב</span><div id="sw-silk" class="swatches"></div></div>
+                <div class="field"><span>צבע הכובע</span><div id="sw-cap" class="swatches"></div></div>
+                <button id="create-go" class="cta" type="button">לאורווה</button>
+                <p id="create-msg" class="msg"></p>
+            </div>
+        </div>
+    </section>
+
+    <!-- קריירה: אורווה ועונה -->
+    <section id="career" class="panel" hidden>
+        <div class="career-grid">
+            <div class="my-horse">
+                <div class="preview-box small"><canvas id="preview-stable" width="320" height="200"></canvas></div>
+                <div class="row-head">
+                    <h2 id="my-name">—</h2>
+                    <span id="my-rating" class="rating"></span>
+                    <button id="edit-horse" class="link-btn" type="button">עריכה</button>
+                </div>
+                <div id="train" class="train"></div>
+            </div>
+            <div class="season">
+                <div class="row-head">
+                    <h2 id="season-title">עונה 1</h2>
+                    <span class="hint">נקודות: 10 · 6 · 4 · 3 · 2 · 1, הגמר כפול</span>
+                </div>
+                <ol id="calendar" class="calendar"></ol>
+                <table class="standings">
+                    <thead><tr><th>#</th><th>סוס</th><th>נק'</th></tr></thead>
+                    <tbody id="standings"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="bet-box career-bet">
+            <div class="bet-col">
+                <h3>הימור על עצמך</h3>
+                <div class="chips" id="self-chips">
+                    <button type="button" data-v="0" class="on">בלי</button>
+                    <button type="button" data-v="10">10</button>
+                    <button type="button" data-v="25">25</button>
+                    <button type="button" data-v="50">50</button>
+                </div>
+            </div>
+            <div class="bet-col payout">
+                <h3>יחס לניצחון</h3>
+                <div><b id="self-odds">—</b> <span class="muted" id="self-line"></span></div>
+            </div>
+            <button id="career-go" class="cta" type="button">למרוץ</button>
+        </div>
+    </section>
+
+    <!-- הימורים -->
+    <section id="paddock" class="panel" hidden>
         <div class="row-head">
             <h2>בחר מרוץ</h2>
             <div id="race-tabs" class="tabs" role="tablist"></div>
+            <span id="bet-cond" class="cond"></span>
         </div>
-
         <div class="row-head">
             <h2>בחר סוס</h2>
             <span class="hint">כל סוס עם כוחות, אסטרטגיה ויחס זכייה משלו</span>
         </div>
         <div id="cards" class="cards"></div>
-
         <div class="bet-box">
             <div class="bet-col">
                 <h3>סוג הימור</h3>
@@ -73,13 +144,18 @@
             <button id="start" class="cta" type="button">לשער הזינוק</button>
         </div>
         <p id="paddock-msg" class="msg"></p>
-        <details class="howto">
-            <summary>איך רוכבים?</summary>
-            <p>במרוץ, לחצו על <b>רווח</b> או על כפתור <b>דהירה</b> בקצב הפרסות. לחיצה כשהסמן נמצא באזור הזהב היא <b>מושלמת</b>: היא נותנת דחיפה חזקה וצורכת פחות כוח, ורצף לחיצות מושלמות מגדיל אותה. לחיצות מהירות מדי מבלבלות את הסוס.</p>
-        </details>
     </section>
 
-    <!-- לוח רכיבה -->
+    <!-- גביעים -->
+    <section id="trophies" class="panel" hidden>
+        <div class="row-head">
+            <h2>הישגים</h2>
+            <span id="ach-count" class="hint"></span>
+        </div>
+        <div id="ach-grid" class="ach-grid"></div>
+    </section>
+
+    <!-- רכיבה -->
     <section id="ride" class="panel" hidden>
         <div class="ride-grid">
             <div class="meters">
@@ -88,11 +164,14 @@
                 <div class="meter-label"><span>קצב הפרסות</span><span id="combo"></span></div>
                 <div class="rhythm"><div class="zone"></div><div id="marker"></div></div>
             </div>
-            <button id="boost" class="boost" type="button">דהירה!<small>רווח / לחיצה</small></button>
+            <div class="ride-btns">
+                <button id="jump" class="boost jump" type="button" hidden>קפיצה<small>חץ למעלה</small></button>
+                <button id="boost" class="boost" type="button">דהירה!<small>רווח / לחיצה</small></button>
+            </div>
         </div>
     </section>
 
-    <!-- לוח תוצאות -->
+    <!-- תוצאות -->
     <section id="results" class="panel" hidden>
         <div class="res-head">
             <h2 id="res-title">תוצאות</h2>
@@ -102,13 +181,23 @@
             <thead><tr><th>מקום</th><th>סוס</th><th>זמן</th><th>פער</th></tr></thead>
             <tbody id="res-body"></tbody>
         </table>
+        <ul id="res-lines" class="res-lines"></ul>
         <div class="res-foot">
-            <div id="res-stats" class="muted"></div>
-            <button id="next" class="cta" type="button">למרוץ הבא</button>
+            <span></span>
+            <button id="next" class="cta" type="button">המשך</button>
         </div>
     </section>
 
-    <footer id="career" class="career"></footer>
+    <section class="howto-wrap">
+        <details class="howto">
+            <summary>איך רוכבים?</summary>
+            <p><b>דהירה:</b> לחצו על רווח או על כפתור הדהירה בקצב הפרסות. לחיצה כשהסמן באזור הזהב היא <b>מושלמת</b>: דחיפה חזקה שצורכת פחות כוח, ורצף לחיצות כאלה מגדיל אותה. לחיצות מהירות מדי מבלבלות את הסוס.</p>
+            <p><b>משוכות:</b> לחצו על חץ למעלה או על כפתור הקפיצה כמה צעדים לפני המשוכה. כשכפתור הקפיצה מאיר בזהב, זה הרגע המושלם. קפיצה מוקדמת או מאוחרת מדי עלולה להסתיים בנפילה.</p>
+            <p><b>קריירה:</b> מרוויחים כסף בכל מרוץ, מאמנים את הסוס ואוספים נקודות. מי שמסיים עונה במקום הראשון זוכה בגביע.</p>
+        </details>
+    </section>
+
+    <footer id="career-stats" class="career-stats"></footer>
 </div>
 <script src="horses.js"></script>
 </body>
