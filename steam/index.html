@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>סטים בעברית – מוד</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+    <div class="topbar-inner">
+        <a class="logo" href="#" data-view="store">
+            <span class="logo-icon">◉</span>
+            <span class="logo-text">סטים</span>
+            <span class="mod-badge">מוד עברית</span>
+        </a>
+        <nav class="main-nav">
+            <a href="#" data-view="store" class="active">חנות</a>
+            <a href="#" data-view="library">ספרייה</a>
+            <a href="#" data-view="wishlist">רשימת משאלות <span id="wish-count" class="pill">0</span></a>
+            <a href="#" data-view="about">אודות המוד</a>
+        </nav>
+        <button id="cart-btn" class="cart-btn">🛒 עגלה (<span id="cart-count">0</span>)</button>
+    </div>
+</header>
+
+<main class="page">
+
+    <section id="view-store" class="view">
+        <h2 class="section-title">מומלצים ומובחרים</h2>
+        <div class="featured" id="featured">
+            <button class="feat-arrow prev" id="feat-prev" aria-label="הקודם">›</button>
+            <div class="feat-slide" id="feat-slide"></div>
+            <button class="feat-arrow next" id="feat-next" aria-label="הבא">‹</button>
+        </div>
+        <div class="feat-dots" id="feat-dots"></div>
+
+        <div class="store-layout">
+            <aside class="sidebar">
+                <h3>חיפוש</h3>
+                <input id="search" type="search" placeholder="חפשו בעברית או באנגלית...">
+                <h3>מחיר</h3>
+                <select id="price-filter">
+                    <option value="all">הכול</option>
+                    <option value="free">חינם לשחק</option>
+                    <option value="50">עד 50 ₪</option>
+                    <option value="100">עד 100 ₪</option>
+                    <option value="sale">במבצע</option>
+                </select>
+                <h3>מיון</h3>
+                <select id="sort">
+                    <option value="pop">פופולריות</option>
+                    <option value="name">שם (א-ת)</option>
+                    <option value="price-asc">מחיר: מהזול ליקר</option>
+                    <option value="price-desc">מחיר: מהיקר לזול</option>
+                    <option value="new">שנת יציאה: חדש קודם</option>
+                    <option value="old">שנת יציאה: ישן קודם</option>
+                </select>
+                <h3>ז'אנרים</h3>
+                <div id="genre-list" class="genre-list"></div>
+            </aside>
+
+            <section class="results">
+                <div class="results-head">
+                    <span id="result-count"></span>
+                    <button id="clear-filters" class="link-btn">נקה סינון</button>
+                </div>
+                <div id="grid" class="grid"></div>
+                <div id="no-results" class="no-results hidden">
+                    <p>לא מצאנו את המשחק בקטלוג של המוד 😕</p>
+                    <a id="steam-search-link" class="btn btn-green" target="_blank" rel="noopener">חפשו אותו בכל חנות Steam ←</a>
+                </div>
+            </section>
+        </div>
+    </section>
+
+    <section id="view-library" class="view hidden">
+        <h2 class="section-title">הספרייה שלי</h2>
+        <p class="muted">משחקים ש"קניתם" בעגלה מופיעים כאן.</p>
+        <div id="library-grid" class="grid"></div>
+    </section>
+
+    <section id="view-wishlist" class="view hidden">
+        <h2 class="section-title">רשימת המשאלות שלי</h2>
+        <div id="wish-grid" class="grid"></div>
+    </section>
+
+    <section id="view-about" class="view hidden">
+        <h2 class="section-title">אודות המוד</h2>
+        <div class="about">
+            <p><strong>סטים בעברית</strong> הוא מוד מעריצים לא רשמי שמתרגם את חנות Steam לעברית – שמות משחקים, תיאורים, ז'אנרים וממשק מלא מימין לשמאל.</p>
+            <p>הקטלוג כולל את המשחקים הפופולריים ביותר. לכל משחק אחר יש קישור לחיפוש ישיר בכל חנות Steam.</p>
+            <p>המחירים משוערים בלבד ומיועדים להמחשה. רכישה אמיתית מתבצעת רק בדף המשחק ב-Steam.</p>
+            <p class="muted">אין קשר ל-Valve Corporation. Steam והלוגואים של המשחקים הם סימנים מסחריים של בעליהם.</p>
+        </div>
+    </section>
+
+</main>
+
+<!-- חלון פרטי משחק -->
+<div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-box">
+        <button class="modal-close" id="modal-close" aria-label="סגור">✕</button>
+        <div id="modal-content"></div>
+    </div>
+</div>
+
+<!-- עגלת קניות -->
+<aside id="cart" class="cart hidden">
+    <div class="cart-head">
+        <h3>עגלת הקניות שלך</h3>
+        <button class="modal-close" id="cart-close" aria-label="סגור">✕</button>
+    </div>
+    <div id="cart-items"></div>
+    <div class="cart-foot">
+        <div class="cart-total">סה"כ משוער: <span id="cart-total">0 ₪</span></div>
+        <button id="checkout" class="btn btn-green">רכוש לעצמי</button>
+    </div>
+</aside>
+
+<div id="toast" class="toast hidden"></div>
+
+<footer class="footer">
+    מוד מעריצים לא רשמי · נבנה באהבה לגיימרים בישראל 🇮🇱
+</footer>
+
+<script src="games.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
