@@ -793,39 +793,96 @@ SCENES.title = (ctx, lt, t) => {
   const a = smooth(1.0, 3.2, lt) * (1 - smooth(7.4, 9.4, lt));
   const spread = lerp(40, 4, easeOut(smooth(1.0, 5, lt)));
   ctx.save();
-  ctx.direction = 'rtl'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = '700 220px "Frank Ruhl Libre"';
-  ctx.letterSpacing = spread + 'px';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '700 230px "Playfair Display"';
+  ctx.letterSpacing = (spread + 34) + 'px';
   ctx.shadowColor = 'rgba(255,200,140,0.6)'; ctx.shadowBlur = 50;
   ctx.fillStyle = `rgba(255,245,230,${a})`;
-  ctx.fillText('החיים', W / 2, H / 2 - 60);
-  ctx.shadowBlur = 0; ctx.letterSpacing = '6px';
+  ctx.fillText('LIFE', W / 2 + (spread + 34) / 2, H / 2 - 70);
+  ctx.shadowBlur = 0; ctx.letterSpacing = '14px';
   const b = smooth(3.4, 5, lt) * (1 - smooth(7.4, 9.4, lt));
-  ctx.font = '300 54px "Heebo"';
+  ctx.font = '300 46px "Montserrat"';
   ctx.fillStyle = `rgba(255,230,200,${b * 0.9})`;
-  ctx.fillText('תחיו אותם. עד הסוף.', W / 2, H / 2 + 120);
+  ctx.fillText('LIVE IT. ALL THE WAY.', W / 2 + 7, H / 2 + 110);
   ctx.restore();
 };
 
 // ---------- captions ----------
+// Karaoke captions on a translucent "glass" bar: each word lights up as it is spoken.
+const CAP = { size: 52, maxW: 1240, lineH: 70, padX: 44, padY: 26, y: H - 175 };
+const capLayout = new Map();
+function layoutCaption(ctx, c) {
+  if (capLayout.has(c)) return capLayout.get(c);
+  ctx.save();
+  ctx.font = `600 ${CAP.size}px "Montserrat"`; ctx.letterSpacing = '0.5px';
+  const space = ctx.measureText(' ').width;
+  const total = c.words.reduce((n, w) => n + ctx.measureText(w.w).width + space, -space);
+  // wrap into balanced rows rather than leaving one word dangling
+  const nRows = Math.ceil(total / CAP.maxW), target = total / nRows + 40;
+  const rows = [[]];
+  let x = 0;
+  for (const w of c.words) {
+    const ww = ctx.measureText(w.w).width;
+    if (x > 0 && x + ww > target) { rows.push([]); x = 0; }
+    rows[rows.length - 1].push({ ...w, x, ww });
+    x += ww + space;
+  }
+  ctx.restore();
+  const rowsW = rows.map(r => r[r.length - 1].x + r[r.length - 1].ww);
+  const L = { rows, rowsW, w: Math.max(...rowsW) };
+  capLayout.set(c, L);
+  return L;
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
 function drawCaption(ctx, t) {
   for (const c of TL.captions) {
-    if (t < c.start - 0.1 || t > c.end + 0.1) continue;
-    const a = smooth(c.start, c.start + 1.1, t) * (1 - smooth(c.end - 1.0, c.end, t));
+    const t0 = c.start - 0.25, t1 = c.end + 0.7;
+    if (t < t0 || t > t1) continue;
+    const a = smooth(t0, t0 + 0.3, t) * (1 - smooth(t1 - 0.3, t1, t));
     if (a <= 0) continue;
-    const rise = (1 - easeOut((t - c.start) / 1.6)) * 18;
+    const L = layoutCaption(ctx, c);
+    const rise = (1 - easeOut((t - t0) / 0.45)) * 16;
+    const boxW = L.w + CAP.padX * 2, boxH = L.rows.length * CAP.lineH + CAP.padY * 2 - (CAP.lineH - CAP.size) + 6;
+    const bx = W / 2 - boxW / 2, by = CAP.y - boxH / 2 + rise;
     ctx.save();
-    ctx.direction = 'rtl'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.font = '500 66px "Frank Ruhl Libre"';
-    ctx.letterSpacing = '2px';
-    ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 28;
-    ctx.fillStyle = `rgba(255,250,240,${a})`;
-    ctx.fillText(c.text, W / 2, H * 0.86 + rise);
-    ctx.shadowBlur = 0;
-    // thin rule under the line, growing outward
-    const w = 140 * easeOut(smooth(c.start + 0.3, c.start + 1.8, t));
-    ctx.fillStyle = `rgba(255,220,180,${a * 0.6})`;
-    ctx.fillRect(W / 2 - w, H * 0.86 + 52 + rise, w * 2, 1.5);
+    ctx.globalAlpha = a;
+    // frosted glass: blur what is behind the bar, then tint it lightly
+    roundRect(ctx, bx, by, boxW, boxH, boxH > 140 ? 34 : boxH / 2);
+    ctx.save(); ctx.clip();
+    ctx.filter = 'blur(14px)';
+    ctx.drawImage(ctx.canvas, bx - 30, by - 30, boxW + 60, boxH + 60, bx - 30, by - 30, boxW + 60, boxH + 60);
+    ctx.filter = 'none';
+    ctx.fillStyle = 'rgba(12,12,18,0.34)'; ctx.fillRect(bx, by, boxW, boxH);
+    ctx.restore();
+    roundRect(ctx, bx + 0.75, by + 0.75, boxW - 1.5, boxH - 1.5, boxH > 140 ? 34 : boxH / 2 - 1);
+    ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineWidth = 1.5; ctx.stroke();
+    // words
+    ctx.font = `600 ${CAP.size}px "Montserrat"`; ctx.letterSpacing = '0.5px';
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    let cur = -1;
+    c.words.forEach((w, i) => { if (t >= w.s - 0.04) cur = i; });
+    const curW = c.words[cur];
+    L.rows.forEach((row, ri) => {
+      const ox = W / 2 - L.rowsW[ri] / 2, oy = by + CAP.padY + CAP.size / 2 + 3 + ri * CAP.lineH;
+      for (const w of row) {
+        const spoken = smooth(w.s - 0.06, w.s + 0.06, t);
+        const active = curW && w.s === curW.s && t < w.e + 0.3;
+        const pop = active ? 1 + 0.07 * Math.sin(Math.PI * clamp((t - w.s + 0.04) / 0.25)) : 1;
+        const cx = ox + w.x + w.ww / 2;
+        ctx.save();
+        ctx.translate(cx, oy); ctx.scale(pop, pop);
+        if (active) { ctx.shadowColor = 'rgba(255,190,90,0.9)'; ctx.shadowBlur = 22; }
+        ctx.fillStyle = active ? 'rgb(255,206,110)' : `rgba(255,255,255,${0.42 + 0.58 * spoken})`;
+        ctx.fillText(w.w, -w.ww / 2, 0);
+        ctx.restore();
+      }
+    });
     ctx.restore();
   }
 }
@@ -862,9 +919,11 @@ function renderFrame(ctx, t) {
     const c = layer(s.id), g = c.getContext('2d');
     g.save(); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
     // slow cinematic push-in on every scene
-    const lt = t - s.start, z = 1 + 0.035 * clamp((t - from) / (to - from));
+    // each scene plays its original animation compressed into its (shorter) slot
+    const z = 1 + 0.035 * clamp((t - from) / (to - from));
+    const k = (s.src[1] - s.src[0]) / (s.end - s.start), lt = (t - s.start) * k;
     g.translate(W / 2, H / 2); g.scale(z, z); g.translate(-W / 2, -H / 2);
-    SCENES[s.id](g, lt, t);
+    SCENES[s.id](g, lt, s.src[0] + lt);
     g.restore();
     ctx.globalAlpha = a;
     ctx.drawImage(c, 0, 0);

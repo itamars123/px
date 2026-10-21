@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="he" dir="rtl">
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<title>החיים</title>
+<title>Life</title>
 <style>
-  @font-face { font-family: "Frank Ruhl Libre"; src: url(fonts/FrankRuhlLibre.ttf); font-weight: 300 900; }
-  @font-face { font-family: "Heebo"; src: url(fonts/Heebo.ttf); font-weight: 100 900; }
+  @font-face { font-family: "Montserrat"; src: url(fonts/Montserrat.ttf); font-weight: 100 900; }
+  @font-face { font-family: "Playfair Display"; src: url(fonts/PlayfairDisplay.ttf); font-weight: 400 900; }
   html, body { margin: 0; background: #000; overflow: hidden; }
   canvas { display: block; width: 100vw; height: auto; }
 </style>
@@ -17,9 +17,9 @@
   fetch('timeline.json').then(r => r.json()).then(async tl => {
     window.TIMELINE = tl;
     await Promise.all([
-      document.fonts.load('500 66px "Frank Ruhl Libre"'),
-      document.fonts.load('700 220px "Frank Ruhl Libre"'),
-      document.fonts.load('300 54px "Heebo"')
+      document.fonts.load('600 52px "Montserrat"'),
+      document.fonts.load('300 46px "Montserrat"'),
+      document.fonts.load('700 230px "Playfair Display"')
     ]);
     const s = document.createElement('script');
     s.src = 'scenes.js';

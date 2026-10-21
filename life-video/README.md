@@ -1,48 +1,55 @@
-# החיים — סרטון קצר
+# Life: a short film
 
-סרטון של 2:30 דקות (‎1920×1080, ‏30fps) על מסע החיים: מהשקט שלפני המפץ הגדול, דרך התא הראשון,
-ילדות, נעורים, אהבה, סערות וזריחה, ועד העונות שמתחלפות והזרע שמתחיל הכול מחדש.
+An 87-second film (1920×1080, 30 fps) about the journey of a life: from the silence
+before the Big Bang, through the first cell, childhood, youth, love, storms and sunrise,
+to the turning seasons and the seed that starts everything again.
 
-כל פריים מצויר בקוד (Canvas 2D) וכל הצליל מסונתז מאפס ב-numpy: פסקול מקורי של פסנתר ו-pad,
-ואפקטים (מפץ, דופק לב, זיקוקים, גשם ורעמים) שמתוזמנים בדיוק לתמונה.
+Every frame is drawn in code (Canvas 2D). The score and sound design are synthesized
+from scratch with numpy, and every boom, heartbeat, firework and thunderclap lands
+on its frame. The narration is a male storyteller voice ("George", ElevenLabs, generated
+through vidIQ). It is aligned word by word with PocketSphinx and drives karaoke captions
+on a frosted-glass bar. The music ducks under the voice.
 
-**הסרטון המוכן:** [`life.mp4`](life.mp4)
+**Final film:** [`life.mp4`](life.mp4) · the earlier 2:30 Hebrew cut: [`life-he.mp4`](life-he.mp4)
 
-## 15 הסצנות
+## Scenes
 
-| זמן | סצנה | כתובית |
+| Time | Scene | Narration |
 |---|---|---|
-| 0:00 | ריק, ניצוץ בודד | בהתחלה — היה רק שקט |
-| 0:09 | המפץ הגדול, ואחריו גלקסיה | ואז — אור |
-| 0:19 | כוכב לכת נוצר | מתוך האבק, נולד עולם |
-| 0:29 | אוקיינוס, תא שמתחלק | החיים מתחילים בקטן. בקטן מאוד. |
-| 0:39 | זרע שהופך לעץ | ולאט לאט — צומחים |
-| 0:50 | דופק לב (א.ק.ג) | לב ראשון פועם |
-| 0:58 | בלונים, עפיפון, אחו | ילדות. הכול חדש, הכול אפשרי |
-| 1:08 | עיר בלילה וזיקוקים | נעורים. לרוץ, לחלום, להעז |
-| 1:18 | שני אורות שנפגשים | ואז מישהו מגיע — והעולם משתנה |
-| 1:28 | סערה בים, סירה קטנה | יש סערות. יש נפילות. |
-| 1:38 | זריחה, ים רגוע | אבל תמיד — קמים שוב |
-| 1:48 | אביב, קיץ, סתיו, חורף | הזמן עובר. העונות מתחלפות. |
-| 2:00 | פנסים שהופכים לכוכבים | ומה שנשאר — הוא האור שהשארנו באחרים |
-| 2:10 | זרע נופל, נבט חדש | וכל סוף — הוא התחלה חדשה |
-| 2:20 | כותרת | החיים · תחיו אותם. עד הסוף. |
+| 0:00 | The void, one spark | In the beginning... there was only silence. |
+| 0:05 | Big Bang → spiral galaxy | And then... light. |
+| 0:11 | A planet forms | From dust and fire, a world was born. |
+| 0:16 | Ocean, a cell divides | Life began small. Impossibly small. |
+| 0:22 | A seed becomes a tree | And slowly... it learned to grow. |
+| 0:28 | ECG heartbeat | A first heartbeat. |
+| 0:32 | Balloons, kite, meadow | Childhood. Everything is new. Everything is possible. |
+| 0:38 | City at night, fireworks | Youth. To run. To dream. To dare. |
+| 0:44 | Two lights meet | Then someone arrives... and the whole world changes. |
+| 0:50 | Storm at sea | There are storms. There are falls. |
+| 0:56 | Sunrise, calm sea | But we always rise again. |
+| 1:01 | Spring → winter | Time moves on. The seasons turn. |
+| 1:08 | Lanterns become stars | And what remains... is the light we leave in others. |
+| 1:14 | A seed falls, a new sprout | Because every ending... is a new beginning. |
+| 1:20 | Title: LIFE | This is life. Live it. All the way. |
 
-## לבנות מחדש
+## Rebuild
 
 ```bash
-# פריימים → וידאו (Playwright + Chromium + ffmpeg)
-node render.mjs out 4
+python3 build_timeline.py                     # scene slots + word-timed captions → timeline.json
+node render.mjs out 4                         # frames → video (Playwright + Chromium + ffmpeg)
 ffmpeg -f concat -safe 0 -i out/segments.txt -c copy out/video.mp4
-# פסקול
-python3 music.py out/life.wav
-# איחוד
-ffmpeg -i out/video.mp4 -i out/life.wav -c:v copy -c:a aac -b:a 256k -shortest life.mp4
+python3 music.py out/life.wav                 # score + sound design + narration
+ffmpeg -i out/video.mp4 -i out/life.wav -c:v libx264 -crf 23 -tune grain -c:a aac -b:a 224k -shortest life.mp4
 ```
 
-לצפייה חיה בדפדפן: מגישים את התיקייה (למשל `npx serve`) ופותחים את `render.html?play`.
+To re-align a new narration: `python3 vo/align.py vo/script.txt <16 kHz mono s16le raw> vo/words.json`
+(needs `pip install pocketsphinx`).
 
-- `timeline.json`: הסצנות, הכתוביות ותזמון האירועים, משותף לתמונה ולסאונד
-- `scenes.js`: כל הסצנות; כל פריים הוא פונקציה טהורה של הזמן
-- `music.py`: פסקול ואפקטים קוליים
-- `fonts/`: ‏Frank Ruhl Libre ו-Heebo (רישיון OFL)
+To watch it live in a browser, serve the folder (e.g. `npx serve`) and open `render.html?play`.
+The live preview plays the picture only, with no sound.
+
+- `timeline.json`: scenes, word-timed captions, narration placement, event timing
+- `scenes.js`: all scenes; each frame is a pure function of time
+- `music.py`: score, sound design, narration mix and ducking
+- `vo/`: narration script, audio and word alignment
+- `fonts/`: Montserrat and Playfair Display (OFL)
