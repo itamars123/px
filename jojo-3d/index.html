@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JOJO 3D</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0a0010; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./three.module.js" } }
+</script>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'three';
+import { FontLoader } from './jsm/FontLoader.js';
+import { TextGeometry } from './jsm/TextGeometry.js';
+
+// ---------- setup ----------
+const W = 1280, H = 720, DURATION = 12;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(W, H, false);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x12001f, 0.035);
+const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 400);
+
+// deterministic random
+let seed = 7;
+const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = x => { x = clamp(x); return x * x * (3 - 2 * x); };
+const backOut = x => { x = clamp(x); const c = 2.2; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, t) => a + (b - a) * t;
+
+// ---------- lights ----------
+scene.add(new THREE.HemisphereLight(0xb07cff, 0x200030, 0.6));
+const key = new THREE.DirectionalLight(0xffe0a0, 2.2);
+key.position.set(5, 10, 6); key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024);
+scene.add(key);
+const fill = new THREE.DirectionalLight(0xd8c0ff, 1.2); fill.position.set(0, 4, 10); scene.add(fill);
+const rim = new THREE.PointLight(0xff3df0, 40, 30); rim.position.set(-4, 3, -4); scene.add(rim);
+const rim2 = new THREE.PointLight(0x36e0ff, 30, 30); rim2.position.set(4, 2, -3); scene.add(rim2);
+
+// ---------- background: sky dome with gradient ----------
+const sky = new THREE.Mesh(
+  new THREE.SphereGeometry(200, 32, 16),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide, fog: false,
+    uniforms: { uTime: { value: 0 } },
+    vertexShader: `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+    fragmentShader: `varying vec3 vP; uniform float uTime;
+      void main(){ vec3 d = normalize(vP);
+        float h = d.y*0.5+0.5;
+        vec3 c = mix(vec3(0.05,0.0,0.1), vec3(0.45,0.05,0.55), pow(h,1.5));
+        float rays = sin(atan(d.z,d.x)*24. + uTime*0.6)*0.5+0.5;
+        c += vec3(0.9,0.6,0.1)*pow(rays,8.)*0.25*smoothstep(0.2,0.7,h);
+        gl_FragColor = vec4(c,1.); }`
+  })
+);
+scene.add(sky);
+
+// ---------- stars / aura particles ----------
+const starGeo = new THREE.BufferGeometry();
+const starPos = new Float32Array(3000 * 3);
+for (let i = 0; i < 3000; i++) {
+  starPos[i * 3] = (rnd() - 0.5) * 160;
+  starPos[i * 3 + 1] = (rnd() - 0.2) * 80;
+  starPos[i * 3 + 2] = (rnd() - 0.5) * 160;
+}
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffd6ff, size: 0.25, fog: false }));
+scene.add(stars);
+
+const AURA_N = 600;
+const auraGeo = new THREE.BufferGeometry();
+const auraPos = new Float32Array(AURA_N * 3);
+const auraSeed = [];
+for (let i = 0; i < AURA_N; i++) auraSeed.push([rnd() * Math.PI * 2, rnd(), 0.6 + rnd() * 1.4]);
+auraGeo.setAttribute('position', new THREE.BufferAttribute(auraPos, 3));
+const aura = new THREE.Points(auraGeo, new THREE.PointsMaterial({
+  color: 0xc77dff, size: 0.12, transparent: true, opacity: 0.9,
+  blending: THREE.AdditiveBlending, depthWrite: false
+}));
+scene.add(aura);
+
+// ---------- floor ----------
+const floor = new THREE.Mesh(
+  new THREE.CircleGeometry(30, 64),
+  new THREE.MeshStandardMaterial({ color: 0x1a0628, roughness: 0.35, metalness: 0.6 })
+);
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true;
+scene.add(floor);
+const ring = new THREE.Mesh(new THREE.TorusGeometry(2.4, 0.05, 8, 96),
+  new THREE.MeshBasicMaterial({ color: 0xffc533 }));
+ring.rotation.x = Math.PI / 2; ring.position.y = 0.02; scene.add(ring);
+const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 2.1, 0.5, 8),
+  new THREE.MeshStandardMaterial({ color: 0x2b0b45, metalness: 0.8, roughness: 0.25 }));
+pedestal.position.y = 0.25; pedestal.castShadow = pedestal.receiveShadow = true;
+scene.add(pedestal);
+
+// ---------- floating gems (intro) ----------
+const gems = [];
+const gemMat = new THREE.MeshStandardMaterial({ color: 0xffc533, metalness: 1, roughness: 0.2, emissive: 0x442200 });
+const gemMat2 = new THREE.MeshStandardMaterial({ color: 0xb44dff, metalness: 0.7, roughness: 0.15, emissive: 0x220033 });
+for (let i = 0; i < 40; i++) {
+  const g = new THREE.Mesh(new THREE.OctahedronGeometry(0.3 + rnd() * 0.5), i % 2 ? gemMat : gemMat2);
+  g.userData = { a: rnd() * Math.PI * 2, r: 4 + rnd() * 10, y: rnd() * 8, s: 0.2 + rnd() * 0.6 };
+  g.castShadow = true;
+  scene.add(g); gems.push(g);
+}
+
+// ---------- original hero figure (built from primitives) ----------
+const hero = new THREE.Group();
+const coatMat = new THREE.MeshStandardMaterial({ color: 0x3a1d6e, roughness: 0.55, metalness: 0.2 });
+const goldMat = new THREE.MeshStandardMaterial({ color: 0xffc533, metalness: 1, roughness: 0.25 });
+const skinMat = new THREE.MeshStandardMaterial({ color: 0xf2c9a0, roughness: 0.6 });
+const hairMat = new THREE.MeshStandardMaterial({ color: 0x150a20, roughness: 0.5 });
+const glowMat = new THREE.MeshBasicMaterial({ color: 0x7dfcff });
+function part(geo, mat, parent, x = 0, y = 0, z = 0) {
+  const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z);
+  m.castShadow = true; parent.add(m); return m;
+}
+const hips = new THREE.Group(); hips.position.y = 2.1; hero.add(hips);
+// coat (long flared cone)
+part(new THREE.CylinderGeometry(0.42, 0.8, 1.9, 12, 1, true), coatMat, hips, 0, -0.55, 0).material.side = THREE.DoubleSide;
+const torso = new THREE.Group(); torso.position.y = 0.2; hips.add(torso);
+part(new THREE.CylinderGeometry(0.5, 0.38, 1.0, 12), coatMat, torso, 0, 0.5, 0);
+part(new THREE.TorusGeometry(0.42, 0.06, 8, 24), goldMat, torso, 0, 0.1, 0).rotation.x = Math.PI / 2; // belt
+part(new THREE.SphereGeometry(0.09, 12, 8), goldMat, torso, 0.18, 0.75, 0.43); // badge
+// legs
+for (const sx of [-0.2, 0.2]) {
+  const leg = part(new THREE.CylinderGeometry(0.13, 0.11, 1.6, 8), hairMat, hips, sx, -0.8, 0);
+  part(new THREE.BoxGeometry(0.22, 0.12, 0.4), goldMat, leg, 0, -0.82, 0.08);
+}
+// head
+const head = new THREE.Group(); head.position.y = 1.3; torso.add(head);
+part(new THREE.CylinderGeometry(0.12, 0.14, 0.2, 8), skinMat, head, 0, -0.15, 0);
+part(new THREE.SphereGeometry(0.3, 20, 16), skinMat, head, 0, 0.15, 0);
+// spiky hair crest + cap
+const cap = part(new THREE.CylinderGeometry(0.33, 0.32, 0.18, 20), hairMat, head, 0, 0.36, -0.02);
+part(new THREE.BoxGeometry(0.5, 0.04, 0.22), hairMat, cap, 0, -0.04, 0.3);
+part(new THREE.TorusGeometry(0.32, 0.03, 6, 24), goldMat, cap, 0, 0, 0).rotation.x = Math.PI / 2;
+for (let i = 0; i < 5; i++) {
+  const sp = part(new THREE.ConeGeometry(0.08, 0.35, 6), hairMat, head, -0.2 + i * 0.1, 0.12, -0.28);
+  sp.rotation.x = -1.1;
+}
+// glowing eyes
+part(new THREE.SphereGeometry(0.04, 8, 8), glowMat, head, -0.1, 0.18, 0.27);
+part(new THREE.SphereGeometry(0.04, 8, 8), glowMat, head, 0.1, 0.18, 0.27);
+// arms (shoulder pivots)
+function makeArm(side) {
+  const sh = new THREE.Group(); sh.position.set(side * 0.58, 0.9, 0); torso.add(sh);
+  part(new THREE.SphereGeometry(0.17, 12, 8), goldMat, sh);
+  part(new THREE.CylinderGeometry(0.12, 0.1, 0.7, 8), coatMat, sh, 0, -0.38, 0);
+  const el = new THREE.Group(); el.position.y = -0.75; sh.add(el);
+  part(new THREE.CylinderGeometry(0.1, 0.09, 0.65, 8), coatMat, el, 0, -0.32, 0);
+  part(new THREE.SphereGeometry(0.13, 12, 8), skinMat, el, 0, -0.7, 0);
+  return { sh, el };
+}
+const armL = makeArm(-1), armR = makeArm(1);
+hero.position.y = 0.5;
+scene.add(hero);
+
+// ghostly guardian spirit behind the hero (original design)
+const spirit = new THREE.Group();
+const spiritMat = new THREE.MeshStandardMaterial({
+  color: 0x9a6bff, emissive: 0x5a20c0, emissiveIntensity: 1.2,
+  transparent: true, opacity: 0, metalness: 0.3, roughness: 0.3, depthWrite: false
+});
+const sTorso = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.3, 2.0, 10), spiritMat); spirit.add(sTorso);
+const sHead = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5, 1), spiritMat); sHead.position.y = 1.5; spirit.add(sHead);
+const sHelm = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.8, 4), spiritMat); sHelm.position.y = 2.1; spirit.add(sHelm);
+const fists = [];
+for (let i = 0; i < 14; i++) {
+  const f = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 10), spiritMat);
+  f.userData = { ph: rnd() * Math.PI * 2, ox: (rnd() - 0.5) * 1.6, oy: (rnd() - 0.5) * 1.2 };
+  spirit.add(f); fists.push(f);
+}
+spirit.position.set(0, 3.4, -1.1);
+scene.add(spirit);
+
+// ---------- shockwave & flash ----------
+const shock = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.0, 64),
+  new THREE.MeshBasicMaterial({ color: 0xfff1a8, transparent: true, opacity: 0, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+shock.rotation.x = -Math.PI / 2; shock.position.y = 0.55; scene.add(shock);
+
+// ---------- 2D overlay sprites (speed lines, onomatopoeia, banner) ----------
+function canvasSprite(drawFn, w, h, scale) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  drawFn(c.getContext('2d'), w, h);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, fog: false }));
+  s.scale.set(scale * w / h, scale, 1); s.renderOrder = 10;
+  return s;
+}
+function sfx(text, color) {
+  return canvasSprite((g, w, h) => {
+    g.font = 'italic 900 150px Impact, "Arial Black", sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineWidth = 18; g.strokeStyle = '#150020'; g.strokeText(text, w / 2, h / 2);
+    g.fillStyle = color; g.fillText(text, w / 2, h / 2);
+  }, 512, 220, 1.4);
+}
+const bubbles = [sfx('!!', '#ffc533'), sfx('?!', '#ff5cf0'), sfx('BOOM', '#7dfcff'), sfx('!!', '#ff5cf0')];
+const bubbleSpots = [[-2.6, 4.6, 0.5], [2.6, 4.2, 0.3], [-2.2, 2.4, 1.2], [2.4, 2.0, 1.0]];
+bubbles.forEach((b, i) => { b.position.set(...bubbleSpots[i]); b.material.opacity = 0; scene.add(b); });
+
+// overlay HUD scene (screen space)
+const hud = new THREE.Scene();
+const hudCam = new THREE.OrthographicCamera(-W / 2, W / 2, H / 2, -H / 2, -1, 1);
+function hudPlane(drawFn, w, h) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  drawFn(c.getContext('2d'), w, h);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthTest: false }));
+  hud.add(m); return m;
+}
+const speedLines = hudPlane((g, w, h) => {
+  g.translate(w / 2, h / 2);
+  for (let i = 0; i < 160; i++) {
+    const a = (i / 160) * Math.PI * 2 + rnd() * 0.03;
+    const r0 = 220 + rnd() * 140, r1 = 900;
+    g.strokeStyle = `rgba(255,255,255,${0.25 + rnd() * 0.5})`;
+    g.lineWidth = 1 + rnd() * 4;
+    g.beginPath(); g.moveTo(Math.cos(a) * r0, Math.sin(a) * r0); g.lineTo(Math.cos(a) * r1, Math.sin(a) * r1); g.stroke();
+  }
+}, W, H);
+const flash = hudPlane((g, w, h) => { g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); }, W, H);
+const banner = hudPlane((g, w, h) => {
+  // arrow-shaped banner
+  g.fillStyle = '#ffc533'; g.strokeStyle = '#150020'; g.lineWidth = 8;
+  g.beginPath(); g.moveTo(10, 15); g.lineTo(w - 90, 15); g.lineTo(w - 10, h / 2); g.lineTo(w - 90, h - 15); g.lineTo(10, h - 15); g.closePath();
+  g.fill(); g.stroke();
+  g.fillStyle = '#150020'; g.font = 'italic 900 50px Impact, "Arial Black", sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('TO BE CONTINUED', w / 2 - 35, h / 2 + 2);
+}, 560, 110);
+const vignette = hudPlane((g, w, h) => {
+  const gr = g.createRadialGradient(w / 2, h / 2, h * 0.3, w / 2, h / 2, h * 0.95);
+  gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(10,0,20,0.85)');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+}, W, H);
+vignette.material.opacity = 1;
+const sepia = hudPlane((g, w, h) => { g.fillStyle = 'rgba(200,150,60,0.35)'; g.fillRect(0, 0, w, h); }, W, H);
+
+// ---------- 3D title ----------
+let title = null;
+const fontJson = await (await fetch('./font.json')).json();
+const font = new FontLoader().parse(fontJson);
+{
+  const geo = new TextGeometry('JOJO', {
+    font, size: 1.6, height: 0.5, curveSegments: 8,
+    bevelEnabled: true, bevelThickness: 0.08, bevelSize: 0.05, bevelSegments: 4
+  });
+  geo.computeBoundingBox(); geo.center();
+  title = new THREE.Mesh(geo, [
+    new THREE.MeshStandardMaterial({ color: 0xffc533, metalness: 1, roughness: 0.18, emissive: 0x6a3a00 }),
+    new THREE.MeshStandardMaterial({ color: 0x8a2be2, metalness: 0.8, roughness: 0.3 })
+  ]);
+  title.castShadow = true;
+  scene.add(title);
+}
+
+// ---------- animation timeline ----------
+function setPose(t) {
+  // idle -> rise -> dramatic pose -> rush
+  const p = ease((t - 4.0) / 1.2); // pose transition
+  armR.sh.rotation.z = lerp(0.15, 2.6, p);   // right arm points up/out
+  armR.sh.rotation.x = lerp(0, -0.4, p);
+  armR.el.rotation.z = lerp(0, -1.2, p);
+  armL.sh.rotation.z = lerp(-0.15, -0.9, p);
+  armL.sh.rotation.x = lerp(0, -1.3, p);
+  armL.el.rotation.x = lerp(0, -1.6, p);
+  hips.rotation.y = lerp(0, 0.5, p);
+  torso.rotation.z = lerp(0, -0.18, p);
+  torso.rotation.y = lerp(0, -0.35, p);
+  head.rotation.y = lerp(0, 0.6, p);
+  head.rotation.x = lerp(0, -0.12, p);
+  // rush: right arm punches forward rapidly
+  const r = clamp((t - 7.0) / 0.3) * (1 - clamp((t - 9.2) / 0.3));
+  if (r > 0) {
+    const jab = Math.sin(t * 50) * 0.5 + 0.5;
+    armR.sh.rotation.z = lerp(armR.sh.rotation.z, 0.2, r);
+    armR.sh.rotation.x = lerp(armR.sh.rotation.x, -1.5 - jab * 0.2, r);
+    armR.el.rotation.z = lerp(armR.el.rotation.z, 0, r);
+    armR.el.rotation.x = lerp(0, -jab * 0.6, r);
+  }
+}
+
+window.renderFrame = function (t) {
+  sky.material.uniforms.uTime.value = t;
+  stars.rotation.y = t * 0.02;
+
+  // gems spiral (fade out by 4s)
+  const gemOut = ease((t - 2.8) / 1.5);
+  gems.forEach((g, i) => {
+    const u = g.userData;
+    const a = u.a + t * u.s;
+    const r = u.r + gemOut * 25;
+    g.position.set(Math.cos(a) * r, u.y + Math.sin(t * 2 + i) * 0.4 + 0.5, Math.sin(a) * r);
+    g.rotation.set(t * u.s * 2, t * u.s * 3, 0);
+  });
+
+  // title: big intro 0-3.2s, flies away; returns as final slam at 10s
+  if (t < 3.6) {
+    const inP = backOut(t / 1.2);
+    title.position.set(0, 3.2, lerp(-30, 2, inP) - ease((t - 2.8) / 0.8) * 40);
+    title.rotation.set(0, (1 - inP) * Math.PI * 2 + Math.sin(t * 1.5) * 0.15, 0);
+    title.scale.setScalar(1.8);
+    title.visible = true;
+  } else if (t > 9.8) {
+    const sp = backOut((t - 9.8) / 0.5);
+    title.visible = true;
+    title.position.set(0, 6.3 + (1 - sp) * 6, 0.5);
+    title.rotation.set(-0.15, Math.sin(t * 2) * 0.08, Math.sin(t * 3) * 0.03);
+    title.scale.setScalar(lerp(3, 1.15, sp));
+  } else title.visible = false;
+
+  // hero rises from below the pedestal
+  const rise = ease((t - 2.6) / 1.6);
+  hero.position.y = lerp(-4.5, 0.5, rise);
+  hero.visible = t > 2.4;
+  hero.rotation.y = lerp(Math.PI, 0, ease((t - 2.6) / 2.0));
+  setPose(t);
+  hips.position.y = 2.1 + Math.sin(t * 2) * 0.03;
+
+  // spirit appears at 5.5s
+  const sp = ease((t - 5.4) / 1.0);
+  spiritMat.opacity = sp * 0.55;
+  spirit.position.y = 3.4 + Math.sin(t * 1.7) * 0.15;
+  spirit.scale.setScalar(lerp(0.3, 1.1, sp));
+  const rushing = t > 7.0 && t < 9.5;
+  fists.forEach((f, i) => {
+    const u = f.userData;
+    if (rushing) {
+      const k = ((t * 6 + u.ph) % 1);
+      f.position.set(u.ox, u.oy - 0.2, 0.4 + k * 3.2);
+      f.scale.setScalar(1 - k * 0.4);
+      f.visible = true;
+    } else {
+      f.position.set(Math.cos(i + t) * 0.9, -0.2 + Math.sin(i * 2 + t) * 0.5, 0.5);
+      f.scale.setScalar(0.6); f.visible = i < 2;
+    }
+  });
+
+  // aura particles swirl when the pose hits
+  const auraOn = ease((t - 4.4) / 0.8);
+  aura.material.opacity = auraOn * 0.9;
+  for (let i = 0; i < AURA_N; i++) {
+    const [a0, h0, r0] = auraSeed[i];
+    const hh = (h0 + t * 0.35) % 1;
+    const a = a0 + t * 1.5 + hh * 3;
+    const r = r0 * (1 - hh * 0.5) * (1 + (rushing ? 0.6 : 0));
+    auraPos[i * 3] = Math.cos(a) * r;
+    auraPos[i * 3 + 1] = 0.5 + hh * 5.5;
+    auraPos[i * 3 + 2] = Math.sin(a) * r;
+  }
+  auraGeo.attributes.position.needsUpdate = true;
+
+  // lights pulse
+  rim.intensity = 40 + Math.sin(t * 8) * 10 + (rushing ? 40 : 0);
+  ring.scale.setScalar(1 + Math.sin(t * 3) * 0.04);
+
+  // shockwave on pose hit (5.2s) and title slam (10.1s)
+  const sw = (t0) => { const k = (t - t0) / 0.8; return k > 0 && k < 1 ? k : -1; };
+  const k1 = Math.max(sw(5.2), sw(10.1));
+  if (k1 >= 0) { shock.scale.setScalar(1 + k1 * 9); shock.material.opacity = 1 - k1; }
+  else shock.material.opacity = 0;
+
+  // onomatopoeia pops
+  const pops = [5.2, 5.6, 7.3, 8.2];
+  bubbles.forEach((b, i) => {
+    const k = t - pops[i];
+    const on = k > 0 && t < 9.6;
+    const s = on ? backOut(k / 0.3) : 0;
+    b.material.opacity = on ? 1 : 0;
+    b.scale.set(1.4 * (512 / 220) * s, 1.4 * s, 1);
+    b.material.rotation = Math.sin(t * 6 + i) * 0.1;
+  });
+
+  // ---------- camera choreography ----------
+  let cp, look;
+  if (t < 3) {            // fly through the gems toward the title
+    const k = ease(t / 3);
+    cp = new THREE.Vector3(Math.sin(k * 1.2) * 8, lerp(7, 3.6, k), lerp(20, 9, k));
+    look = new THREE.Vector3(0, 3.2, 0);
+  } else if (t < 7) {     // low hero angle, orbit
+    const k = (t - 3) / 4;
+    const a = lerp(-0.9, 0.7, ease(k));
+    const d = lerp(10, 6.5, ease(k));
+    cp = new THREE.Vector3(Math.sin(a) * d, lerp(1.6, 1.2, k), Math.cos(a) * d);
+    look = new THREE.Vector3(0, lerp(2.4, 3.2, k), 0);
+  } else if (t < 9.8) {   // rush: tight, shaky front shot
+    const k = (t - 7) / 2.8;
+    const shake = 0.06;
+    cp = new THREE.Vector3(lerp(1.5, -1.2, k) + Math.sin(t * 61) * shake, 3.3 + Math.cos(t * 47) * shake, lerp(5.5, 4.2, k));
+    look = new THREE.Vector3(0, 3.2, 1);
+  } else {                // final: pull back for title
+    const k = ease((t - 9.8) / 1.6);
+    const shake = (1 - clamp((t - 10.1) / 0.6)) * 0.15 * (t > 10.1 ? 1 : 0);
+    cp = new THREE.Vector3(lerp(-1.2, 0, k) + Math.sin(t * 70) * shake, lerp(3.3, 3.6, k), lerp(4.2, 12.5, k));
+    look = new THREE.Vector3(0, lerp(3.2, 4.0, k), 0);
+  }
+  camera.position.copy(cp); camera.lookAt(look);
+  camera.fov = t > 7 && t < 9.8 ? 58 : 50; camera.updateProjectionMatrix();
+
+  // ---------- HUD ----------
+  speedLines.material.opacity = rushing ? 0.55 + Math.sin(t * 40) * 0.2 : (t > 5.15 && t < 5.6 ? 0.6 : 0);
+  speedLines.rotation.z = t * 0.5;
+  const fl = (t0, d) => clamp(1 - Math.abs(t - t0) / d);
+  flash.material.opacity = Math.max(fl(5.2, 0.15), fl(9.65, 0.25), fl(10.1, 0.15)) * 0.9;
+  const bk = (t - 10.9) / 0.4;
+  banner.material.opacity = bk > 0 ? 1 : 0;
+  banner.position.set(lerp(-W, -W / 2 + 330, backOut(bk)), -H / 2 + 80, 0);
+  sepia.material.opacity = ease((t - 10.9) / 0.4);
+
+  renderer.autoClear = true;
+  renderer.render(scene, camera);
+  renderer.autoClear = false;
+  renderer.render(hud, hudCam);
+};
+
+window.DURATION = DURATION;
+window.ready = true;
+
+// live preview when opened normally in a browser (not during capture)
+if (!new URLSearchParams(location.search).has('capture')) {
+  const start = performance.now();
+  (function loop() {
+    window.renderFrame(((performance.now() - start) / 1000) % DURATION);
+    requestAnimationFrame(loop);
+  })();
+}
+</script>
+</body>
+</html>
