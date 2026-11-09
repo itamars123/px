@@ -1,0 +1,366 @@
+<title>Last Light</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Barlow:wght@400;500;700&family=Special+Elite&display=swap">
+<style>
+/* Layout: a survivor's field notice. Full-bleed flashlight hero, then a narrow column of pinned notes on a dark street. Single dark look by choice. */
+:root {
+  --night: #0d0f12;      /* street at night */
+  --ash: #191b1f;        /* concrete panels */
+  --line: #2c2e33;       /* hairline edges */
+  --paper: #d9d2bf;      /* text, old newsprint */
+  --dim: #8d8778;        /* secondary text */
+  --sodium: #f0a530;     /* street-lamp amber, the one accent */
+  --blood: #9b2a1e;      /* damage, danger */
+  --display: "Black Ops One", Impact, "Arial Narrow", sans-serif;
+  --body: "Barlow", "Helvetica Neue", Arial, sans-serif;
+  --note: "Special Elite", "Courier New", monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--night); color: var(--paper); }
+body { margin: 0; font-family: var(--body); font-size: 17px; line-height: 1.6; }
+a { color: var(--sodium); }
+:focus-visible { outline: 2px solid var(--sodium); outline-offset: 3px; }
+
+.wrap { max-width: 1040px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* ---------- Hero ---------- */
+.hero { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
+.hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.hero .wrap { position: relative; padding-block: 96px 88px; display: grid; gap: 22px; pointer-events: none; }
+.hero .wrap > * { pointer-events: auto; }
+.eyebrow { font-family: var(--note); color: var(--sodium); letter-spacing: 0.12em; text-transform: uppercase; font-size: 14px; margin: 0; }
+h1 { font-family: var(--display); font-weight: 400; font-size: clamp(64px, 15vw, 168px); line-height: 0.88; margin: 0; letter-spacing: 0.02em; text-wrap: balance;
+  color: var(--paper); text-shadow: 0 0 40px rgba(240,165,48,0.25); }
+h1 span { color: var(--sodium); }
+.lede { font-size: clamp(18px, 2.4vw, 22px); max-width: 34ch; margin: 0; color: var(--paper); }
+.cta-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-top: 8px; }
+.btn { display: inline-block; font-family: var(--display); font-size: 22px; letter-spacing: 0.06em; text-decoration: none; color: var(--night);
+  background: var(--sodium); padding: 14px 30px; border: 0; transition: transform .15s, box-shadow .15s; box-shadow: 0 0 0 0 rgba(240,165,48,0.4); }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(240,165,48,0.35); }
+.ghost { font-family: var(--note); color: var(--dim); font-size: 14px; }
+.hint { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); bottom: 14px; font-family: var(--note); font-size: 12px; color: var(--dim); margin: 0; }
+
+/* ---------- Sections ---------- */
+section.block { padding-block: 72px; border-bottom: 1px solid var(--line); }
+h2 { font-family: var(--display); font-weight: 400; font-size: clamp(34px, 6vw, 52px); line-height: 1; margin: 0 0 10px; letter-spacing: 0.02em; text-wrap: balance; }
+.sub { color: var(--dim); max-width: 60ch; margin: 0 0 36px; }
+
+/* Night cycle: a real sequence, so numbered */
+.cycle { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0; border: 1px solid var(--line); }
+.step { padding: 26px 24px; border-right: 1px solid var(--line); display: grid; gap: 8px; align-content: start; min-width: 0; }
+.step:last-child { border-right: 0; }
+.step .t { font-family: var(--note); color: var(--sodium); font-size: 14px; letter-spacing: 0.1em; }
+.step h3 { font-family: var(--display); font-weight: 400; font-size: 26px; margin: 0; }
+.step p { margin: 0; color: var(--dim); }
+@media (max-width: 760px) { .step { border-right: 0; border-bottom: 1px solid var(--line); } .step:last-child { border-bottom: 0; } }
+
+/* Bestiary: field notes */
+.beasts { display: grid; grid-template-columns: repeat(auto-fit, minmax(178px, 1fr)); gap: 16px; }
+.beast { background: var(--ash); border: 1px solid var(--line); padding: 20px; display: grid; grid-template-rows: auto auto 1fr auto; gap: 10px; min-width: 0; }
+.beast canvas { width: 72px; height: 72px; }
+.beast h3 { font-family: var(--display); font-weight: 400; font-size: 24px; margin: 0; }
+.beast p { margin: 0; color: var(--dim); font-size: 15px; }
+.beast .from { font-family: var(--note); font-size: 13px; color: var(--sodium); }
+.beast.boss { border-color: var(--blood); }
+.beast.boss .from { color: #e0614f; }
+dl.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 0; font-variant-numeric: tabular-nums; border-top: 1px dashed var(--line); padding-top: 10px; }
+dl.stats div { display: grid; }
+dl.stats dt { font-family: var(--note); font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; }
+dl.stats dd { margin: 0; font-weight: 700; font-size: 18px; }
+
+/* Arsenal table */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); }
+table { width: 100%; border-collapse: collapse; min-width: 560px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+th { font-family: var(--note); font-weight: 400; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--dim); background: var(--ash); }
+td:first-child { font-family: var(--display); font-size: 20px; }
+tr:last-child td { border-bottom: 0; }
+td .bar { display: block; height: 4px; background: var(--line); margin-top: 6px; width: 100px; }
+td .bar i { display: block; height: 100%; background: var(--sodium); }
+.note { font-family: var(--note); color: var(--dim); font-size: 14px; margin: 18px 0 0; }
+
+/* Controls */
+.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 40px; }
+.controls h3 { font-family: var(--note); font-weight: 400; color: var(--sodium); text-transform: uppercase; letter-spacing: 0.1em; font-size: 14px; margin: 0 0 14px; }
+.keys { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.keys li { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+.keys .k { display: inline-flex; gap: 4px; min-width: 128px; }
+kbd { font-family: var(--note); font-size: 13px; border: 1px solid var(--line); border-bottom-width: 3px; background: var(--ash); padding: 2px 8px; color: var(--paper); }
+
+/* Closing call */
+.final { padding-block: 96px; text-align: left; }
+.final h2 { font-size: clamp(40px, 8vw, 80px); }
+.final p { color: var(--dim); max-width: 46ch; }
+footer { padding-block: 28px; color: var(--dim); font-size: 14px; font-family: var(--note); }
+
+@media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
+</style>
+
+<header class="hero" id="top">
+  <canvas id="hero-canvas" aria-hidden="true"></canvas>
+  <div class="wrap">
+    <p class="eyebrow">Emergency broadcast · Day 0</p>
+    <h1>LAST<br><span>LIGHT</span></h1>
+    <p class="lede">The power is gone. The streets belong to the dead after dark. You have a pistol, a flashlight, and one night at a time.</p>
+    <div class="cta-row">
+      <a class="btn" href="apocalypse/index.html">Play now</a>
+      <span class="ghost">Free · runs in your browser · keyboard, mouse or touch</span>
+    </div>
+  </div>
+  <p class="hint">Move your pointer. Keep the light on them.</p>
+</header>
+
+<main>
+  <section class="block" id="how">
+    <div class="wrap">
+      <h2>One night at a time</h2>
+      <p class="sub">Each round is a night. The horde gets bigger, faster and tougher, about 13% more health every night you survive.</p>
+      <div class="cycle">
+        <div class="step"><span class="t">01 · Dusk</span><h3>The lights go out</h3><p>The dark closes in over the first seconds of each night. Your flashlight is the only thing that shows what's coming.</p></div>
+        <div class="step"><span class="t">02 · Night</span><h3>Hold the street</h3><p>Night 1 sends 14 of them. Every night after adds 6 more. Kill everything and pick up the scrap they drop.</p></div>
+        <div class="step"><span class="t">03 · Dawn</span><h3>Spend the scrap</h3><p>Patch up, buy armor and better rounds, or save for the shotgun and SMG. Then the sun sets again.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="bestiary">
+    <div class="wrap">
+      <h2>Field notes on the dead</h2>
+      <p class="sub">Night 1 base stats, from the survivors who wrote them down. Speed is in steps per second.</p>
+      <div class="beasts" id="beasts"></div>
+    </div>
+  </section>
+
+  <section class="block" id="arsenal">
+    <div class="wrap">
+      <h2>What you can carry</h2>
+      <p class="sub">You start with the pistol. Everything else costs scrap at dawn.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Weapon</th><th>Damage / shot</th><th>Fire rate</th><th>Magazine</th><th>Cost</th></tr></thead>
+          <tbody>
+            <tr><td>Pistol</td><td>26<span class="bar"><i style="width:22%"></i></span></td><td>3.6 / s<span class="bar"><i style="width:27%"></i></span></td><td>12 · ammo never runs out</td><td>Starter</td></tr>
+            <tr><td>Shotgun</td><td>15 × 8 pellets<span class="bar"><i style="width:100%"></i></span></td><td>1.3 / s<span class="bar"><i style="width:10%"></i></span></td><td>6 shells</td><td>35 scrap</td></tr>
+            <tr><td>SMG</td><td>14<span class="bar"><i style="width:12%"></i></span></td><td>13.3 / s<span class="bar"><i style="width:100%"></i></span></td><td>32 rounds</td><td>55 scrap</td></tr>
+            <tr><td>Grenade</td><td>up to 180 in a blast<span class="bar"><i style="width:100%"></i></span></td><td>thrown</td><td>2 to start</td><td>14 scrap / 2</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Hollow points add 15% damage per level. Speed loaders cut reload time by 12% per level.</p>
+    </div>
+  </section>
+
+  <section class="block" id="controls">
+    <div class="wrap">
+      <h2>Controls</h2>
+      <p class="sub">Works on a keyboard and mouse, or on a phone with two thumbs.</p>
+      <div class="controls">
+        <div>
+          <h3>Keyboard &amp; mouse</h3>
+          <ul class="keys">
+            <li><span class="k"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span>Move</li>
+            <li><span class="k"><kbd>Mouse</kbd></span>Aim, hold to fire</li>
+            <li><span class="k"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>Q</kbd></span>Switch weapon</li>
+            <li><span class="k"><kbd>R</kbd></span>Reload</li>
+            <li><span class="k"><kbd>G</kbd><kbd>Right click</kbd></span>Throw grenade</li>
+            <li><span class="k"><kbd>P</kbd><kbd>Esc</kbd></span>Pause</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Touch</h3>
+          <ul class="keys">
+            <li><span class="k"><kbd>Left thumb</kbd></span>Drag to move</li>
+            <li><span class="k"><kbd>Right thumb</kbd></span>Drag to aim and fire</li>
+            <li><span class="k"><kbd>SW</kbd></span>Switch weapon</li>
+            <li><span class="k"><kbd>G</kbd></span>Grenade</li>
+            <li><span class="k"><kbd>R</kbd></span>Reload</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="final">
+    <div class="wrap">
+      <h2>The sun is going down.</h2>
+      <p>Your best run is saved on this device. See how many nights you can last.</p>
+      <div class="cta-row"><a class="btn" href="apocalypse/index.html">Start night 1</a></div>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap">Last Light · a browser survival game · no install, no account</div></footer>
+
+<script>
+(() => {
+  const TAU = Math.PI * 2;
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- Bestiary cards (stats mirror game.js) ----------
+  const BEASTS = [
+    { name: 'Walker', hp: 55, speed: 55, dmg: 10, r: 14, color: '#5d7a3a', skin: '#7f9b55', from: 'Every night', text: 'Slow and stupid, but there are always more of them. Don\'t let them box you in.' },
+    { name: 'Runner', hp: 32, speed: 125, dmg: 7, r: 11, color: '#7a5d3a', skin: '#a3895c', from: 'From night 2', text: 'Fresh ones. Fragile, but twice as fast as you think. Shoot them first.' },
+    { name: 'Brute', hp: 280, speed: 40, dmg: 24, r: 24, color: '#4a3a5d', skin: '#6c5a82', from: 'From night 3', text: 'Bullets barely slow it. Keep moving and let the shotgun do the talking.' },
+    { name: 'Spitter', hp: 48, speed: 50, dmg: 12, r: 13, color: '#3a6d5d', skin: '#5fa88f', from: 'From night 4', text: 'Keeps its distance and spits acid. Cars and walls block the spit.', ranged: true },
+    { name: 'The Beast', hp: 1800, speed: 62, dmg: 35, r: 40, color: '#6d2a2a', skin: '#9a4040', from: 'Every 5th night', text: 'Something big walks with the horde. Save your grenades for it.', boss: true },
+  ];
+  const wrap = document.getElementById('beasts');
+  for (const b of BEASTS) {
+    const el = document.createElement('article');
+    el.className = 'beast' + (b.boss ? ' boss' : '');
+    el.innerHTML = `<canvas width="144" height="144" aria-hidden="true"></canvas>
+      <div><h3>${b.name}</h3><span class="from">${b.from}</span></div>
+      <p>${b.text}</p>
+      <dl class="stats"><div><dt>Health</dt><dd>${b.hp}</dd></div><div><dt>Speed</dt><dd>${b.speed}</dd></div><div><dt>Bite</dt><dd>${b.dmg}</dd></div></dl>`;
+    wrap.append(el);
+    drawZombie(el.querySelector('canvas').getContext('2d'), b);
+  }
+  function drawZombie(c, z) {
+    const r = Math.min(z.r, 30) * 1.5;
+    c.save(); c.translate(64, 72); c.rotate(-0.5);
+    c.strokeStyle = z.skin; c.lineWidth = Math.max(5, r * 0.35); c.lineCap = 'round';
+    if (!z.ranged) {
+      c.beginPath(); c.moveTo(r * 0.2, -r * 0.7); c.lineTo(r * 1.4, -r * 0.45); c.stroke();
+      c.beginPath(); c.moveTo(r * 0.2, r * 0.7); c.lineTo(r * 1.4, r * 0.55); c.stroke();
+    }
+    c.fillStyle = z.color; c.beginPath(); c.arc(0, 0, r, 0, TAU); c.fill();
+    c.fillStyle = z.skin; c.beginPath(); c.arc(r * 0.15, 0, r * 0.62, 0, TAU); c.fill();
+    if (z.ranged) { c.fillStyle = '#8fdc5a'; c.beginPath(); c.arc(r * 0.6, 0, r * 0.3, 0, TAU); c.fill(); }
+    c.fillStyle = z.boss ? '#ffde3a' : '#ff3a2a';
+    c.shadowColor = c.fillStyle; c.shadowBlur = 8;
+    c.beginPath(); c.arc(r * 0.45, -r * 0.25, r * 0.12, 0, TAU); c.arc(r * 0.45, r * 0.25, r * 0.12, 0, TAU); c.fill();
+    c.restore();
+  }
+
+  // ---------- Hero: dark street, a flashlight that follows the pointer ----------
+  const cv = document.getElementById('hero-canvas');
+  const ctx = cv.getContext('2d');
+  const hero = cv.parentElement;
+  let W = 0, H = 0, dpr = 1, street = null;
+  const dark = document.createElement('canvas'), dctx = dark.getContext('2d');
+  const light = { x: 0, y: 0, tx: 0, ty: 0, auto: true };
+  const shamblers = [];
+
+  function build() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = hero.clientWidth; H = hero.clientHeight;
+    for (const c of [cv, dark]) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+    // asphalt, lane markings, cracks, an old car or two
+    street = document.createElement('canvas'); street.width = cv.width; street.height = cv.height;
+    const g = street.getContext('2d'); g.scale(dpr, dpr);
+    g.fillStyle = '#25261f'; g.fillRect(0, 0, W, H);
+    for (let i = 0; i < W * H / 120; i++) {
+      g.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,240' : '0,0,0'},${0.02 + Math.random() * 0.05})`;
+      const s = 2 + Math.random() * 6; g.fillRect(Math.random() * W, Math.random() * H, s, s);
+    }
+    g.fillStyle = '#1d1e19'; g.fillRect(0, H * 0.55, W, 150);
+    g.strokeStyle = 'rgba(220,190,90,0.35)'; g.lineWidth = 4; g.setLineDash([30, 30]);
+    g.beginPath(); g.moveTo(0, H * 0.55 + 75); g.lineTo(W, H * 0.55 + 75); g.stroke(); g.setLineDash([]);
+    g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = 1.5;
+    for (let i = 0; i < 40; i++) {
+      let x = Math.random() * W, y = Math.random() * H, a = Math.random() * TAU;
+      g.beginPath(); g.moveTo(x, y);
+      for (let j = 0; j < 6; j++) { a += Math.random() * 1.6 - 0.8; x += Math.cos(a) * 20; y += Math.sin(a) * 20; g.lineTo(x, y); }
+      g.stroke();
+    }
+    const cars = [[W * 0.72, H * 0.58, 90, 44, '#6b2b2b'], [W * 0.12, H * 0.7, 90, 44, '#2b4a6b'], [W * 0.88, H * 0.15, 44, 90, '#5a5a5a']];
+    for (const [x, y, w, h, col] of cars) {
+      g.fillStyle = 'rgba(0,0,0,0.45)'; g.fillRect(x + 8, y + 10, w, h);
+      g.fillStyle = col; g.fillRect(x, y, w, h);
+      g.fillStyle = 'rgba(0,0,0,0.35)'; w > h ? g.fillRect(x + w * 0.3, y + 4, w * 0.4, h - 8) : g.fillRect(x + 4, y + h * 0.3, w - 8, h * 0.4);
+    }
+    for (let i = 0; i < 6; i++) { // blood
+      g.fillStyle = 'rgba(80,8,8,0.5)';
+      const bx = Math.random() * W, by = Math.random() * H;
+      for (let k = 0; k < 4; k++) { g.beginPath(); g.arc(bx + Math.random() * 20 - 10, by + Math.random() * 20 - 10, 4 + Math.random() * 8, 0, TAU); g.fill(); }
+    }
+    light.x = light.tx = W * 0.62; light.y = light.ty = H * 0.5;
+    if (!shamblers.length) {
+      const kinds = [BEASTS[0], BEASTS[0], BEASTS[0], BEASTS[1], BEASTS[2], BEASTS[0], BEASTS[3]];
+      kinds.forEach((k, i) => shamblers.push({ x: W * (0.35 + Math.random() * 0.6), y: Math.random() * H, k, wob: Math.random() * TAU, sp: 8 + Math.random() * 14 }));
+    }
+  }
+
+  hero.addEventListener('pointermove', (e) => {
+    const r = hero.getBoundingClientRect();
+    light.tx = e.clientX - r.left; light.ty = e.clientY - r.top; light.auto = false;
+  });
+  hero.addEventListener('pointerleave', () => { light.auto = true; });
+
+  function frame(t) {
+    const s = t / 1000;
+    if (light.auto) { light.tx = W * 0.62 + Math.cos(s * 0.5) * W * 0.22; light.ty = H * 0.5 + Math.sin(s * 0.8) * H * 0.25; }
+    light.x += (light.tx - light.x) * 0.08; light.y += (light.ty - light.y) * 0.08;
+    const px = W * 0.5, py = H + 40; // the survivor stands just below the fold
+    const ang = Math.atan2(light.y - py, light.x - px);
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(street, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // zombies drift toward the survivor and wrap around
+    for (const z of shamblers) {
+      if (!reduce) {
+        z.wob += 0.03;
+        const a = Math.atan2(py - z.y, px - z.x) + Math.sin(z.wob) * 0.3;
+        z.x += Math.cos(a) * z.sp / 60; z.y += Math.sin(a) * z.sp / 60;
+        if (z.y > H + 30) { z.y = -30; z.x = Math.random() * W; }
+      }
+      const a = Math.atan2(py - z.y, px - z.x), r = z.k.r, sway = Math.sin(z.wob * 2) * r * 0.25;
+      ctx.save(); ctx.translate(z.x, z.y); ctx.rotate(a);
+      ctx.strokeStyle = z.k.skin; ctx.lineWidth = Math.max(3, r * 0.35); ctx.lineCap = 'round';
+      if (!z.k.ranged) {
+        ctx.beginPath(); ctx.moveTo(r * 0.2, -r * 0.7); ctx.lineTo(r * 1.4, -r * 0.5 + sway); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(r * 0.2, r * 0.7); ctx.lineTo(r * 1.4, r * 0.5 - sway); ctx.stroke();
+      }
+      ctx.fillStyle = z.k.color; ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill();
+      ctx.fillStyle = z.k.skin; ctx.beginPath(); ctx.arc(r * 0.15, 0, r * 0.62, 0, TAU); ctx.fill();
+      if (z.k.ranged) { ctx.fillStyle = '#8fdc5a'; ctx.beginPath(); ctx.arc(r * 0.6, 0, r * 0.3, 0, TAU); ctx.fill(); }
+      ctx.restore();
+    }
+
+    // darkness with a flashlight cone cut out of it
+    dctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    dctx.globalCompositeOperation = 'source-over';
+    dctx.clearRect(0, 0, W, H);
+    dctx.fillStyle = 'rgba(6,8,14,0.93)'; dctx.fillRect(0, 0, W, H);
+    dctx.globalCompositeOperation = 'destination-out';
+    const reach = Math.hypot(light.x - px, light.y - py) + 160;
+    let g = dctx.createRadialGradient(px, py, 30, px, py, reach);
+    g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.75, 'rgba(0,0,0,0.85)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    dctx.fillStyle = g; dctx.beginPath(); dctx.moveTo(px, py); dctx.arc(px, py, reach, ang - 0.28, ang + 0.28); dctx.closePath(); dctx.fill();
+    g = dctx.createRadialGradient(light.x, light.y, 0, light.x, light.y, 130);
+    g.addColorStop(0, 'rgba(0,0,0,0.9)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    dctx.fillStyle = g; dctx.beginPath(); dctx.arc(light.x, light.y, 130, 0, TAU); dctx.fill();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(dark, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // warm tint inside the beam
+    ctx.globalCompositeOperation = 'soft-light';
+    g = ctx.createRadialGradient(light.x, light.y, 0, light.x, light.y, 220);
+    g.addColorStop(0, 'rgba(240,165,48,0.45)'); g.addColorStop(1, 'rgba(240,165,48,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over';
+
+    // eyes glow through the dark
+    for (const z of shamblers) {
+      const a = Math.atan2(py - z.y, px - z.x), ca = Math.cos(a), sa = Math.sin(a), r = z.k.r;
+      ctx.fillStyle = 'rgba(255,50,30,0.75)';
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.arc(z.x + ca * r * 0.45 - sa * side * r * 0.25, z.y + sa * r * 0.45 + ca * side * r * 0.25, Math.max(1.6, r * 0.12), 0, TAU);
+        ctx.fill();
+      }
+    }
+    if (!reduce) requestAnimationFrame(frame);
+  }
+
+  build();
+  window.addEventListener('resize', () => { build(); if (reduce) frame(0); });
+  requestAnimationFrame(frame);
+})();
+</script>
