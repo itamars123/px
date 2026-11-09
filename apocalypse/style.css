@@ -1,0 +1,35 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0c0a; color: #e8e2d0;
+  font-family: "Courier New", ui-monospace, monospace; user-select: none; -webkit-user-select: none; touch-action: none; }
+canvas { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
+.hidden { display: none !important; }
+
+#hud { position: fixed; inset: 0; pointer-events: none; padding: 12px 16px; }
+.bar-wrap { position: relative; width: min(280px, 60vw); height: 20px; background: #2a1414; border: 2px solid #5a3a2a; }
+.bar { height: 100%; background: linear-gradient(90deg, #a3241c, #e0502c); transition: width .15s; }
+#hp-text { position: absolute; inset: 0; text-align: center; font-size: 13px; line-height: 16px; font-weight: bold; }
+#stats { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 15px; text-shadow: 0 1px 2px #000; }
+#night { color: #f2c14e; }
+#scrap { color: #9fd36a; }
+#banner { position: absolute; top: 30%; left: 0; right: 0; text-align: center; font-size: clamp(28px, 6vw, 56px);
+  color: #f2c14e; text-shadow: 0 0 18px #000, 0 2px 0 #000; letter-spacing: 4px; opacity: 0; transition: opacity .5s; }
+#banner.show { opacity: 1; }
+
+.overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px; padding: 16px; text-align: center; background: radial-gradient(ellipse at center, rgba(40,20,10,.85), rgba(0,0,0,.95)); overflow-y: auto; }
+h1 { font-size: clamp(44px, 11vw, 96px); letter-spacing: 8px; color: #f2c14e; text-shadow: 0 0 30px #c2410c, 0 4px 0 #3b1d0a; }
+h2 { font-size: clamp(30px, 7vw, 52px); color: #f2c14e; letter-spacing: 3px; }
+.tag { font-style: italic; color: #b9ab8c; }
+.controls { color: #b9ab8c; font-size: 14px; line-height: 1.7; }
+button { pointer-events: auto; font: inherit; font-size: 18px; font-weight: bold; padding: 12px 28px; background: #c2410c; color: #fff4e0;
+  border: 2px solid #f2c14e; cursor: pointer; letter-spacing: 1px; }
+button:hover:not(:disabled) { background: #e0502c; }
+button:disabled { opacity: .4; cursor: not-allowed; }
+#best { color: #9fd36a; }
+
+#shop-items { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; width: min(900px, 100%); }
+.item { background: rgba(20,14,8,.9); border: 1px solid #5a3a2a; padding: 12px; display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.item h3 { color: #f2c14e; font-size: 16px; }
+.item p { font-size: 13px; color: #b9ab8c; flex: 1; }
+.item button { font-size: 14px; padding: 8px 10px; }
+#shop-scrap { color: #9fd36a; font-size: 18px; }

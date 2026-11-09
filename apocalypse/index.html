@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Last Light</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud" class="hidden">
+    <div class="bar-wrap"><div id="hp-bar" class="bar"></div><span id="hp-text"></span></div>
+    <div id="stats">
+      <span id="night"></span>
+      <span id="weapon"></span>
+      <span id="scrap"></span>
+      <span id="kills"></span>
+    </div>
+    <div id="banner"></div>
+  </div>
+
+  <div id="menu" class="overlay">
+    <h1>LAST LIGHT</h1>
+    <p class="tag">The world ended. You didn't.</p>
+    <div class="controls">
+      <p><b>WASD / Arrows</b> move &nbsp;·&nbsp; <b>Mouse</b> aim &amp; shoot</p>
+      <p><b>1 2 3</b> or <b>Q</b> / wheel switch weapon &nbsp;·&nbsp; <b>R</b> reload &nbsp;·&nbsp; <b>P</b> pause</p>
+      <p>Touch: left stick moves, right stick aims &amp; fires</p>
+    </div>
+    <p>Survive each night. Collect scrap. Spend it at dawn.</p>
+    <button id="start-btn">Start surviving</button>
+    <p id="best"></p>
+  </div>
+
+  <div id="shop" class="overlay hidden">
+    <h2 id="shop-title">Dawn</h2>
+    <p id="shop-scrap"></p>
+    <div id="shop-items"></div>
+    <button id="next-night-btn">Face the next night</button>
+  </div>
+
+  <div id="pause" class="overlay hidden">
+    <h2>Paused</h2>
+    <button id="resume-btn">Resume</button>
+  </div>
+
+  <div id="over" class="overlay hidden">
+    <h2>You didn't make it</h2>
+    <p id="over-stats"></p>
+    <button id="restart-btn">Try again</button>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
