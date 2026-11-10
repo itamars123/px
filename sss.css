@@ -1,22 +1,355 @@
+:root {
+    --bg: #f6f4ef;
+    --text: #1f2933;
+    --muted: #6b7280;
+    --tile-border: #cbd2d9;
+    --tile-filled: #7b8794;
+    --key-bg: #e4e7eb;
+    --correct: #0f9d8a;
+    --present: #e8913a;
+    --absent: #7b8794;
+    --on-color: #ffffff;
+    --dialog-bg: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #14181f;
+        --text: #f1f5f9;
+        --muted: #9aa5b1;
+        --tile-border: #3e4c59;
+        --tile-filled: #9aa5b1;
+        --key-bg: #323f4b;
+        --correct: #14b8a6;
+        --present: #f59e0b;
+        --absent: #3e4c59;
+        --dialog-bg: #1f2933;
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
 body {
-
-
-color: blue;
-
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", Arial, "Noto Sans Hebrew", sans-serif;
 }
 
-
-#container {
-display: grid;
-grid-template-columns: 1fr 1fr 1fr 1fr;
-width: 150px;
-gap: 5px;
-
+.app {
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 12px 16px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
 }
 
-#letter {
+.top {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--tile-border);
+    padding-bottom: 8px;
+}
 
+h1 {
+    margin: 0;
+    font-size: 1.8rem;
+    letter-spacing: 1px;
+}
 
-background-color: aqua;
+.subtitle {
+    color: var(--muted);
+    margin: 8px 0 4px;
+    font-size: 0.9rem;
+    text-align: center;
+}
 
+.icon-btn {
+    background: none;
+    border: 2px solid var(--tile-border);
+    color: var(--text);
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+
+.message {
+    min-height: 2.2em;
+    margin: 6px 0;
+    font-weight: bold;
+    text-align: center;
+}
+
+.message.show {
+    background: var(--text);
+    color: var(--bg);
+    padding: 6px 14px;
+    border-radius: 6px;
+}
+
+/* ---------- Board ---------- */
+
+.board {
+    display: grid;
+    grid-template-rows: repeat(6, 1fr);
+    gap: 6px;
+    margin-bottom: 20px;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+
+.row.shake {
+    animation: shake 0.4s;
+}
+
+.letter {
+    width: 62px;
+    height: 62px;
+    border: 2px solid var(--tile-border);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: bold;
+    user-select: none;
+}
+
+.letter.filled {
+    border-color: var(--tile-filled);
+    animation: pop 0.1s;
+}
+
+.letter.reveal {
+    animation: flip 0.5s ease forwards;
+}
+
+.letter.correct,
+.letter.present,
+.letter.absent {
+    color: var(--on-color);
+    border-color: transparent;
+}
+
+.letter.correct { background: var(--correct); }
+.letter.present { background: var(--present); }
+.letter.absent  { background: var(--absent); }
+
+.letter.win {
+    animation: bounce 0.6s ease;
+}
+
+/* ---------- Keyboard ---------- */
+
+.keyboard {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.key-row {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+}
+
+.key {
+    flex: 1;
+    max-width: 46px;
+    height: 54px;
+    border: none;
+    border-radius: 6px;
+    background: var(--key-bg);
+    color: var(--text);
+    font-size: 1.25rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.key.wide {
+    max-width: 76px;
+    flex: 1.6;
+    font-size: 0.95rem;
+}
+
+.key:active {
+    transform: scale(0.95);
+}
+
+.key.correct,
+.key.present,
+.key.absent {
+    color: var(--on-color);
+}
+
+.key.correct { background: var(--correct); }
+.key.present { background: var(--present); }
+.key.absent  { background: var(--absent); }
+
+.new-game {
+    margin-top: 18px;
+    padding: 12px 28px;
+    border: none;
+    border-radius: 24px;
+    background: var(--correct);
+    color: var(--on-color);
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.hidden {
+    display: none;
+}
+
+/* ---------- Dialogs ---------- */
+
+dialog {
+    border: none;
+    border-radius: 12px;
+    background: var(--dialog-bg);
+    color: var(--text);
+    max-width: 360px;
+    width: calc(100% - 32px);
+    padding: 20px;
+}
+
+dialog::backdrop {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+dialog h2 {
+    margin-top: 0;
+    text-align: center;
+}
+
+dialog ul {
+    list-style: none;
+    padding: 0;
+}
+
+dialog li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.tile-sample {
+    display: inline-flex;
+    width: 34px;
+    height: 34px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-weight: bold;
+    color: var(--on-color);
+    flex-shrink: 0;
+}
+
+.tile-sample.correct { background: var(--correct); }
+.tile-sample.present { background: var(--present); }
+.tile-sample.absent  { background: var(--absent); }
+
+.close-btn {
+    display: block;
+    margin: 16px auto 0;
+    padding: 8px 24px;
+    border: none;
+    border-radius: 18px;
+    background: var(--correct);
+    color: var(--on-color);
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    text-align: center;
+}
+
+.stats strong {
+    display: block;
+    font-size: 1.6rem;
+}
+
+.stats span {
+    font-size: 0.75rem;
+    color: var(--muted);
+}
+
+.distribution {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dist-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dist-bar {
+    background: var(--absent);
+    color: var(--on-color);
+    padding: 2px 6px;
+    min-width: 22px;
+    font-weight: bold;
+    text-align: left;
+}
+
+.dist-bar.current {
+    background: var(--correct);
+}
+
+/* ---------- Animations ---------- */
+
+@keyframes pop {
+    50% { transform: scale(1.1); }
+}
+
+@keyframes flip {
+    0%   { transform: rotateX(0); }
+    50%  { transform: rotateX(90deg); }
+    100% { transform: rotateX(0); }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-6px); }
+    40%, 80% { transform: translateX(6px); }
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    40%      { transform: translateY(-18px); }
+}
+
+@media (max-width: 380px) {
+    .letter {
+        width: 54px;
+        height: 54px;
+        font-size: 1.7rem;
+    }
+
+    .key {
+        height: 48px;
+        font-size: 1.05rem;
+    }
 }

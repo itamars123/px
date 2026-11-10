@@ -1,39 +1,57 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>נחש את המילה</title>
     <link rel="stylesheet" href="sss.css">
-
 </head>
-<body dir="rtl">
-    <center>
+<body>
+    <main class="app">
+        <header class="top">
+            <button id="help-btn" class="icon-btn" aria-label="איך משחקים">?</button>
+            <h1>נחש את המילה</h1>
+            <button id="stats-btn" class="icon-btn" aria-label="סטטיסטיקה">📊</button>
+        </header>
 
-        <h1> מישחק הוורדל הראשון בעברית</h1>
-<input type="text">
-<button> נחש</button>
-<br>
-<br>
-<div id="container"> 
+        <p class="subtitle">מישחק ניחוש המילים הראשון בעברית · 4 אותיות · 6 ניסיונות</p>
 
-<div class="letter">ח</div>
-<div class="letter">צ</div>
-<div class="letter">י</div>
-<div class="letter">ל</div>
+        <div id="message" class="message" role="status" aria-live="polite"></div>
 
+        <div id="board" class="board" aria-label="לוח המשחק"></div>
 
+        <div id="keyboard" class="keyboard" aria-label="מקלדת"></div>
 
+        <button id="new-game" class="new-game hidden">משחק חדש</button>
+    </main>
 
- <div  class="letter">ח</div>
- <div class="letter">ל</div>
- <div class="letter">י</div>
- <div class="letter">ל</div>
+    <dialog id="help-dialog">
+        <h2>איך משחקים?</h2>
+        <p>נחשו את המילה הסודית בת 4 האותיות ב-6 ניסיונות או פחות.</p>
+        <p>אחרי כל ניחוש, צבע המשבצות מראה כמה התקרבתם:</p>
+        <ul>
+            <li><span class="tile-sample correct">ש</span> האות במילה ובמקום הנכון</li>
+            <li><span class="tile-sample present">ל</span> האות במילה אבל במקום אחר</li>
+            <li><span class="tile-sample absent">ו</span> האות לא נמצאת במילה</li>
+        </ul>
+        <p>אין צורך להקליד אותיות סופיות (ך ם ן ף ץ) – הן מתוקנות אוטומטית.</p>
+        <p>אפשר להקליד גם במקלדת רגילה, גם בפריסה אנגלית.</p>
+        <button class="close-btn" data-close>הבנתי!</button>
+    </dialog>
 
-</div>
+    <dialog id="stats-dialog">
+        <h2>סטטיסטיקה</h2>
+        <div class="stats">
+            <div><strong id="stat-played">0</strong><span>משחקים</span></div>
+            <div><strong id="stat-winpct">0</strong><span>% ניצחונות</span></div>
+            <div><strong id="stat-streak">0</strong><span>רצף נוכחי</span></div>
+            <div><strong id="stat-best">0</strong><span>רצף שיא</span></div>
+        </div>
+        <h3>התפלגות ניחושים</h3>
+        <div id="distribution" class="distribution"></div>
+        <button class="close-btn" data-close>סגור</button>
+    </dialog>
 
-    </center>
-
-     <script src="ssdas.js"></script>
+    <script src="ssdas.js"></script>
 </body>
 </html>
