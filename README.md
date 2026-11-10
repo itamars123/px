@@ -23,3 +23,9 @@ Open `index.html` in a browser.
 | `index.html` | Page layout, help and stats dialogs |
 | `sss.css` | Styles, animations, dark mode |
 | `ssdas.js` | Game logic and word list (`WORDS`); add more 4-letter words there |
+
+---
+
+## Also in this repo: Fragile Haul
+
+A 3D first-person salvage horror game lives in [`fragile-haul/`](fragile-haul/). Open `fragile-haul/index.html` in a browser to play.

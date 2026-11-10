@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fragile Haul</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <canvas id="view"></canvas>
+
+    <!-- In-game HUD -->
+    <div id="hud" class="hidden">
+        <div class="hud-top-left">
+            <div class="level" id="hud-level">NIGHT 1</div>
+            <div class="quota-label">In the drop zone: <span id="hud-zone">$0</span> / <span id="hud-quota">$0</span></div>
+            <div class="bar quota-bar"><div id="hud-quota-fill"></div></div>
+        </div>
+        <div class="hud-top-right">
+            <div>Banked</div>
+            <div class="banked" id="hud-banked">$0</div>
+        </div>
+
+        <div id="crosshair"></div>
+        <div id="hover-label"></div>
+
+        <div class="hud-bottom-left">
+            <div class="bar-label">HEALTH</div>
+            <div class="bar health-bar"><div id="hud-health"></div></div>
+            <div class="bar-label">STAMINA</div>
+            <div class="bar stamina-bar"><div id="hud-stamina"></div></div>
+        </div>
+
+        <div id="hud-held" class="hud-held"></div>
+        <div id="toast" class="toast"></div>
+        <div id="danger" class="danger"></div>
+        <div id="popups"></div>
+    </div>
+
+    <!-- Menus -->
+    <div id="overlay" class="overlay">
+        <div class="panel" id="panel-menu">
+            <h1>FRAGILE HAUL</h1>
+            <p class="tag">Night-shift salvage. Everything is priceless. Nothing is sturdy.</p>
+            <p>Search the abandoned estate for valuables and float them back to the glowing
+               <b>drop zone</b> with your grab beam. Every bump costs money, and loud noises
+               wake up whatever lives here.</p>
+            <p>Fill the quota, stand in the zone and press <kbd>E</kbd> to cash out and move to the next night.</p>
+            <div class="controls">
+                <div><kbd>W A S D</kbd> move</div>
+                <div><kbd>Mouse</kbd> look</div>
+                <div><kbd>Hold left click</kbd> grab beam</div>
+                <div><kbd>Right click</kbd> throw held item</div>
+                <div><kbd>Wheel</kbd> pull / push held item</div>
+                <div><kbd>Shift</kbd> sprint (noisy)</div>
+                <div><kbd>C</kbd> / <kbd>Ctrl</kbd> crouch (quiet)</div>
+                <div><kbd>E</kbd> cash out in drop zone</div>
+            </div>
+            <button id="btn-start">Start shift</button>
+            <p class="best" id="best-score"></p>
+        </div>
+
+        <div class="panel hidden" id="panel-pause">
+            <h2>Paused</h2>
+            <button id="btn-resume">Resume</button>
+        </div>
+
+        <div class="panel hidden" id="panel-cleared">
+            <h2 id="cleared-title">Night cleared</h2>
+            <div class="summary" id="cleared-summary"></div>
+            <button id="btn-next">Next night</button>
+        </div>
+
+        <div class="panel hidden" id="panel-dead">
+            <h2>You were caught</h2>
+            <div class="summary" id="dead-summary"></div>
+            <button id="btn-restart">New shift</button>
+        </div>
+    </div>
+
+    <script src="lib/three.min.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
