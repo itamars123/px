@@ -49,15 +49,20 @@ async function askChatGPT(prompt) {
 async function askGemini(prompt) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY is not set on the server");
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+  // Gemini's OpenAI-compatible endpoint (same request format as ChatGPT).
+  const url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model: GEMINI_MODEL,
+      messages: [{ role: "user", content: prompt }],
+    }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error?.message || `Gemini error ${res.status}`);
-  return data.candidates[0].content.parts.map((p) => p.text).join("").trim();
+  const data = await res.json().catch(() => ({}));
+  const err = Array.isArray(data) ? data[0]?.error : data.error;
+  if (!res.ok) throw new Error(err?.message || `Gemini error ${res.status}`);
+  return data.choices[0].message.content.trim();
 }
 
 function readBody(req) {
