@@ -1,39 +1,32 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="he">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>וורדל בעברית</title>
     <link rel="stylesheet" href="sss.css">
-
 </head>
 <body dir="rtl">
     <center>
+        <h1>מישחק הוורדל הראשון בעברית</h1>
 
-        <h1> מישחק הוורדל הראשון בעברית</h1>
-<input type="text">
-<button> נחש</button>
-<br>
-<br>
-<div id="container"> 
+        <input type="text" id="guess" maxlength="4" autocomplete="off">
+        <button id="guess-btn">נחש</button>
+        <p id="message"></p>
 
-<div class="letter">ח</div>
-<div class="letter">צ</div>
-<div class="letter">י</div>
-<div class="letter">ל</div>
+        <div id="container"></div>
 
-
-
-
- <div  class="letter">ח</div>
- <div class="letter">ל</div>
- <div class="letter">י</div>
- <div class="letter">ל</div>
-
-</div>
-
+        <div id="ai">
+            <label for="provider">רמז מ:</label>
+            <select id="provider">
+                <option value="chatgpt">ChatGPT</option>
+                <option value="gemini">Gemini</option>
+            </select>
+            <button id="hint-btn">תן לי רמז</button>
+            <p id="hint"></p>
+        </div>
     </center>
 
-     <script src="ssdas.js"></script>
+    <script src="ssdas.js"></script>
 </body>
 </html>
