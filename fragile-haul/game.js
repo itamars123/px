@@ -1303,12 +1303,18 @@ function showPanel(name) {
     $("hud").classList.toggle("hidden", name === "menu");
 }
 
+// Pointer lock is optional: some embeds and browsers refuse it, so fall back
+// to plain mouse-move look ("free look") when it is unavailable.
+let freeLook = false;
+let hadLock = false;
 function lockPointer() {
+    if (!canvas.requestPointerLock) { freeLook = true; return; }
     try {
-        const r = canvas.requestPointerLock && canvas.requestPointerLock();
-        if (r && r.catch) r.catch(() => {});
-    } catch { /* not supported */ }
+        const r = canvas.requestPointerLock();
+        if (r && r.catch) r.catch(() => { freeLook = true; });
+    } catch { freeLook = true; }
 }
+document.addEventListener("pointerlockerror", () => { freeLook = true; });
 
 function startNight() {
     buildLevel(game.night);
@@ -1340,7 +1346,8 @@ $("btn-resume").addEventListener("click", () => {
 });
 
 document.addEventListener("pointerlockchange", () => {
-    if (!document.pointerLockElement && game.state === "playing") {
+    if (document.pointerLockElement) { hadLock = true; freeLook = false; return; }
+    if (hadLock && game.state === "playing") {
         game.state = "paused";
         input.mouseDown = false;
         held = null;
@@ -1353,7 +1360,7 @@ canvas.addEventListener("click", () => {
 });
 
 document.addEventListener("mousemove", e => {
-    if (game.state !== "playing" || !document.pointerLockElement) return;
+    if (game.state !== "playing" || !(document.pointerLockElement || freeLook)) return;
     player.yaw -= e.movementX * 0.0022;
     player.pitch = clamp(player.pitch - e.movementY * 0.0022, -1.45, 1.45);
 });
@@ -1375,7 +1382,10 @@ document.addEventListener("keydown", e => {
     input.keys[e.code] = true;
     if (game.state !== "playing") return;
     if (e.code === "KeyE") tryCashOut();
-    if (e.code === "KeyP") document.exitPointerLock ? document.exitPointerLock() : null;
+    if (e.code === "KeyP" || (e.code === "Escape" && !document.pointerLockElement)) {
+        if (document.pointerLockElement) document.exitPointerLock();
+        else { game.state = "paused"; input.mouseDown = false; held = null; showPanel("pause"); }
+    }
     if (e.code.startsWith("Control")) e.preventDefault();
 });
 document.addEventListener("keyup", e => { input.keys[e.code] = false; });
