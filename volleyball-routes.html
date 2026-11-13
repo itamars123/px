@@ -1,0 +1,532 @@
+<title>Volleyball Attack Routes</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: scoreboard-style header, full-width top-down court board, then a two-column breakdown (play notes | phase timeline). */
+:root {
+  --page: #EDF1F5;
+  --panel: #FFFFFF;
+  --ink: #13202C;
+  --muted: #5A6A78;
+  --rule: #D3DBE2;
+  --accent: #1D69AE;
+  --accent-ink: #FFFFFF;
+  --court: #DB8E4C;
+  --court-in: #E39A58;
+  --freezone: #2E6B8A;
+  --cline: #FFFFFF;
+  --team: #10304F;
+  --opp: #A12C25;
+  --hot: #FFD23F;
+  --attack: #C8102E;
+  --ball: #F6D13B;
+  --ball-line: #1B4E8C;
+  --display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page: #0E151C; --panel: #15202A; --ink: #E5ECF2; --muted: #93A3B1; --rule: #253340;
+    --accent: #66AEEB; --accent-ink: #0B1824;
+    --court: #B06F3A; --court-in: #BC7A42; --freezone: #1C4458; --cline: #F1F1F1;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --page: #0E151C; --panel: #15202A; --ink: #E5ECF2; --muted: #93A3B1; --rule: #253340;
+  --accent: #66AEEB; --accent-ink: #0B1824;
+  --court: #B06F3A; --court-in: #BC7A42; --freezone: #1C4458; --cline: #F1F1F1;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--page); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 48px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 20px; }
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(34px, 6vw, 56px); line-height: .95; margin: 4px 0 0; letter-spacing: .01em; text-transform: uppercase; text-wrap: balance; }
+h1 span { color: var(--accent); }
+.rot { font-family: var(--display); font-weight: 600; font-size: 18px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.tab {
+  font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: .03em; text-transform: uppercase;
+  border: 1.5px solid var(--rule); background: var(--panel); color: var(--ink);
+  padding: 6px 14px 5px; border-radius: 4px; cursor: pointer; display: flex; gap: 8px; align-items: baseline;
+}
+.tab small { font-family: var(--mono); font-size: 11px; color: var(--muted); font-weight: 500; letter-spacing: 0; text-transform: none; }
+.tab[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.tab[aria-pressed="true"] small { color: var(--accent-ink); opacity: .8; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--hot); outline-offset: 2px; }
+
+.board { background: var(--freezone); border-radius: 6px; overflow: hidden; }
+.board svg { display: block; width: 100%; height: auto; }
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.btn {
+  font-family: var(--body); font-weight: 600; font-size: 14px; border: 1.5px solid var(--rule);
+  background: var(--panel); color: var(--ink); border-radius: 4px; padding: 7px 14px; cursor: pointer; min-width: 44px;
+}
+.btn.primary { background: var(--ink); color: var(--page); border-color: var(--ink); min-width: 92px; }
+.scrub { flex: 1 1 220px; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.scrub input { flex: 1; min-width: 0; accent-color: var(--accent); }
+.clock { font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+label.chk { display: flex; gap: 6px; align-items: center; font-size: 14px; color: var(--muted); cursor: pointer; }
+select { font: inherit; font-size: 14px; padding: 6px 8px; border-radius: 4px; border: 1.5px solid var(--rule); background: var(--panel); color: var(--ink); }
+
+.detail { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; }
+@media (max-width: 760px) { .detail { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 18px 20px; min-width: 0; }
+.card h2 { font-family: var(--display); font-weight: 700; font-size: 28px; text-transform: uppercase; margin: 0; line-height: 1.05; }
+.call { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 2px; }
+.card p { margin: 10px 0 0; max-width: 62ch; }
+.card ul { margin: 12px 0 0; padding-left: 18px; display: grid; gap: 6px; }
+.card h3 { font-family: var(--display); font-weight: 700; font-size: 16px; text-transform: uppercase; letter-spacing: .06em; margin: 0 0 10px; color: var(--muted); }
+
+.phases { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.phases li { display: grid; grid-template-columns: 88px 1fr; gap: 10px; padding: 7px 10px; border-radius: 4px; align-items: baseline; transition: background .15s; }
+.phases li .t { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.phases li b { font-family: var(--display); font-size: 17px; text-transform: uppercase; letter-spacing: .03em; }
+.phases li span.d { display: block; font-size: 13px; color: var(--muted); }
+.phases li.on { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.phases li.on b { color: var(--accent); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { display: inline-block; width: 22px; height: 0; border-top: 2.5px solid; }
+@media (prefers-reduced-motion: reduce) { .phases li { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Play board · 5-1 system · serve receive</div>
+      <h1>Volleyball <span>Attack Routes</span></h1>
+    </div>
+    <div class="rot">Rotation 1 · setter in zone 1</div>
+  </header>
+
+  <nav class="tabs" id="tabs" aria-label="Choose a play"></nav>
+
+  <div class="board">
+    <svg id="court" viewBox="-1.4 -1.3 20.8 11.6" role="img" aria-label="Top-down volleyball court showing player routes and ball flight"></svg>
+  </div>
+
+  <div class="controls">
+    <button class="btn primary" id="play" type="button">Pause</button>
+    <button class="btn" id="restart" type="button" aria-label="Restart play">↺ Restart</button>
+    <div class="scrub">
+      <input type="range" id="scrub" min="0" max="5" step="0.01" value="0" aria-label="Play timeline">
+      <span class="clock" id="clock">0.00 s</span>
+    </div>
+    <select id="speed" aria-label="Playback speed">
+      <option value="0.35">0.35×</option>
+      <option value="0.6" selected>0.6×</option>
+      <option value="1">1× real time</option>
+    </select>
+    <label class="chk"><input type="checkbox" id="routes" checked> Show routes</label>
+  </div>
+
+  <div class="detail">
+    <section class="card">
+      <h2 id="pname"></h2>
+      <div class="call" id="pcall"></div>
+      <p id="pdesc"></p>
+      <ul id="ppoints"></ul>
+      <div class="legend">
+        <span><i style="border-color:var(--team);border-top-style:dashed"></i>Player route</span>
+        <span><i style="border-color:#13385C;border-top-style:dotted"></i>Pass</span>
+        <span><i style="border-color:#9aa9b5"></i>Set</span>
+        <span><i style="border-color:var(--attack)"></i>Attack</span>
+        <span><i style="border-color:var(--hot);border-top-width:4px"></i>Set target</span>
+      </div>
+    </section>
+    <section class="card">
+      <h3>Timeline</h3>
+      <ol class="phases" id="phases"></ol>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.getElementById("court");
+  const el = (tag, attrs = {}, parent = svg) => {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    parent && parent.appendChild(n);
+    return n;
+  };
+
+  // ---------- court (meters: x 0..18 baseline to baseline, net at 9; y 0..9 sideline to sideline) ----------
+  const defs = el("defs");
+  const mk = (id, color) => {
+    const m = el("marker", { id, viewBox: "0 0 10 10", refX: 7, refY: 5, markerWidth: 4.5, markerHeight: 4.5, orient: "auto-start-reverse" }, defs);
+    el("path", { d: "M0,0 L10,5 L0,10 z", fill: color }, m);
+  };
+  mk("arTeam", "#10304F"); mk("arSet", "#FFFFFF"); mk("arAtk", "#C8102E"); mk("arPass", "#13385C");
+
+  el("rect", { x: -1.4, y: -1.3, width: 20.8, height: 11.6, fill: "var(--freezone)" });
+  el("rect", { x: 0, y: 0, width: 18, height: 9, fill: "var(--court)" });
+  el("rect", { x: 6, y: 0, width: 6, height: 9, fill: "var(--court-in)" });
+  const L = { stroke: "var(--cline)", "stroke-width": 0.05, fill: "none" };
+  el("rect", { x: 0, y: 0, width: 18, height: 9, ...L });
+  el("line", { x1: 6, y1: 0, x2: 6, y2: 9, ...L });
+  el("line", { x1: 12, y1: 0, x2: 12, y2: 9, ...L });
+  // attack-line extensions (dashed, outside the court)
+  [6, 12].forEach(x => {
+    el("line", { x1: x, y1: -1.75, x2: x, y2: -0.15, ...L, "stroke-dasharray": "0.15 0.2" });
+    el("line", { x1: x, y1: 9.15, x2: x, y2: 10.75, ...L, "stroke-dasharray": "0.15 0.2" });
+  });
+  // net + posts
+  el("line", { x1: 9, y1: -0.5, x2: 9, y2: 9.5, stroke: "#1B1B1B", "stroke-width": 0.12 });
+  el("line", { x1: 9, y1: -0.5, x2: 9, y2: 9.5, stroke: "#FFFFFF", "stroke-width": 0.04, "stroke-dasharray": "0.08 0.08" });
+  el("circle", { cx: 9, cy: -0.5, r: 0.14, fill: "#1B1B1B" });
+  el("circle", { cx: 9, cy: 9.5, r: 0.14, fill: "#1B1B1B" });
+
+  const T = (x, y, s, size = 0.34, attrs = {}) => {
+    const t = el("text", { x, y, "font-size": size, "text-anchor": "middle", fill: "var(--cline)", "font-family": "Barlow Condensed, Arial Narrow, sans-serif", "font-weight": 700, ...attrs });
+    t.textContent = s; return t;
+  };
+  T(9, -0.82, "NET", 0.32, { opacity: 0.9 });
+  T(6, 10.05, "3 M LINE", 0.28, { opacity: 0.75 });
+  T(3, -0.55, "OUR SIDE", 0.34, { opacity: 0.8, "letter-spacing": 0.05 });
+  T(15, -0.55, "OPPONENT", 0.34, { opacity: 0.8, "letter-spacing": 0.05 });
+  // zone numbers on our side
+  [[4, 7.5, 1.5], [3, 7.5, 4.5], [2, 7.5, 7.5], [5, 3, 1.5], [6, 3, 4.5], [1, 3, 7.5]].forEach(([z, x, y]) =>
+    T(x, y + 0.45, z, 1.3, { fill: "#FFFFFF", opacity: 0.13, "font-weight": 800 }));
+
+  const gTrails = el("g");
+  const gBallPath = el("g");
+  const gOpp = el("g");
+  const gPlayers = el("g");
+  const gBall = el("g");
+
+  // ---------- timing helpers ----------
+  const ease = u => u * u * (3 - 2 * u);
+  function at(keys, t) {
+    if (t <= keys[0][0]) return [keys[0][1], keys[0][2]];
+    for (let i = 0; i < keys.length - 1; i++) {
+      const a = keys[i], b = keys[i + 1];
+      if (t <= b[0]) {
+        const u = b[0] === a[0] ? 1 : ease((t - a[0]) / (b[0] - a[0]));
+        return [a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
+      }
+    }
+    const z = keys[keys.length - 1]; return [z[1], z[2]];
+  }
+
+  // ---------- roster & formation (legal overlap for rotation 1) ----------
+  const ROLES = {
+    S:   { label: "S",   name: "Setter" },
+    OH1: { label: "OH1", name: "Outside 1" },
+    MB:  { label: "MB",  name: "Middle" },
+    OPP: { label: "OPP", name: "Opposite" },
+    OH2: { label: "OH2", name: "Outside 2" },
+    L:   { label: "L",   name: "Libero" },
+  };
+  const FORM = { S: [4.0, 8.4], OH1: [5.2, 7.0], MB: [8.3, 4.2], OPP: [8.3, 1.2], OH2: [4.6, 2.0], L: [4.4, 4.5] };
+  const TARGET = [8.3, 5.6];
+  const PASS_T = 1.0, SET_T = 2.0;
+
+  // ---------- plays ----------
+  // attack: per hitter, [contactX, contactY, contactTime, approachStart offset dx, dy, extra waypoints]
+  const PLAYS = [
+    {
+      id: "four", name: "Outside High", call: "Call: \"4\" · high ball to zone 4", passer: "L", to: "OH1",
+      serve: [18.6, 2.2], land: [15.8, 7.9], arc: 4.4,
+      desc: "The safe out-of-system option. The libero passes to target, the setter lofts a high ball to the left pin and Outside 1 takes a full four-step approach after swinging across from zone 2.",
+      points: ["OH1 releases from the pass early and opens to the sideline before the approach.", "The middle still runs a quick to hold the opposing middle blocker.", "The high set gives the blockers time to close; the hitter looks to tool the block or cut cross-court."],
+      attack: {
+        OH1: { c: [8.3, 1.0], tc: 3.35, way: [[1.05, 5.0, 4.0], [2.35, 5.4, 0.1]] },
+        MB:  { c: [8.5, 5.0], tc: 2.32, start: [6.1, 4.7] },
+        OPP: { c: [8.4, 8.2], tc: 3.05, way: [[1.1, 6.9, 5.0]], start: [5.8, 8.8] },
+        OH2: { c: [5.6, 4.1], tc: 3.15, start: [3.1, 4.1] },
+      },
+    },
+    {
+      id: "quick", name: "Quick 1", call: "Call: \"1\" · first-tempo set in front of setter", passer: "OH2", to: "MB",
+      serve: [18.6, 4.8], land: [12.6, 2.6], arc: 0.35,
+      desc: "The middle is already in the air when the setter touches the ball. A low, fast set about a meter in front of the setter beats the opposing middle before the block can form.",
+      points: ["The middle starts the approach while the pass is still rising.", "Set height is barely above the net; timing matters more than power.", "Watch the opposing middle blocker: they only cover a fraction of the distance."],
+      attack: {
+        MB:  { c: [8.5, 5.0], tc: 2.32, start: [6.1, 4.7] },
+        OH1: { c: [8.3, 1.0], tc: 2.95, way: [[1.05, 5.0, 4.0], [2.1, 5.4, 0.2]] },
+        OPP: { c: [8.4, 8.2], tc: 2.95, way: [[1.1, 6.9, 5.0]], start: [5.8, 8.8] },
+        OH2: { c: [5.6, 4.1], tc: 3.0, start: [3.1, 4.1] },
+      },
+    },
+    {
+      id: "slide", name: "Slide", call: "Call: \"Slide\" · middle attacks behind the setter", passer: "OH1", to: "MB",
+      serve: [18.6, 7.4], land: [14.2, 1.6], arc: 1.3,
+      desc: "The middle fakes a quick, then runs parallel to the net behind the setter and takes off from one foot near the right pin. The opposite stays left and Outside 1 attacks through the middle.",
+      points: ["A one-foot takeoff lets the middle drift along the net and hit across the body.", "The set is flat and pushed toward the antenna; the hitter chases it.", "With no switch, the front-row hitters cover zones 4 and 3."],
+      attack: {
+        MB:  { c: [8.55, 8.0], tc: 2.62, way: [[1.3, 6.9, 3.6]], start: [7.7, 6.4], approach: 0.55 },
+        OH1: { c: [8.4, 3.6], tc: 2.85, start: [5.6, 2.9] },
+        OPP: { c: [8.3, 1.2], tc: 3.0, start: [5.5, 0.4] },
+        OH2: { c: [5.6, 4.1], tc: 3.05, start: [3.1, 4.4] },
+      },
+    },
+    {
+      id: "pipe", name: "Pipe", call: "Call: \"Pipe\" · back-row attack from zone 6", passer: "L", to: "OH2",
+      serve: [18.6, 3.4], land: [16.2, 5.0], arc: 2.0,
+      desc: "Outside 2 is in the back row, so they take off behind the 3 m line and attack through the seam between the opposing blockers. Three front-row decoys keep the block spread.",
+      points: ["Takeoff must be behind the 3 m line; the ball can be contacted above it after the jump.", "The set floats slightly toward the net so the hitter can broad-jump into it.", "The quick from the middle freezes the opposing middle blocker."],
+      attack: {
+        OH2: { c: [5.75, 4.3], tc: 3.0, start: [3.0, 4.2] },
+        MB:  { c: [8.5, 5.0], tc: 2.32, start: [6.1, 4.7] },
+        OH1: { c: [8.3, 1.0], tc: 2.95, way: [[1.05, 5.0, 4.0], [2.1, 5.4, 0.2]] },
+        OPP: { c: [8.4, 8.2], tc: 2.95, way: [[1.1, 6.9, 5.0]], start: [5.8, 8.8] },
+      },
+    },
+    {
+      id: "back", name: "Back Set", call: "Call: \"Red\" · fast back set to the right pin", passer: "OH2", to: "OPP",
+      serve: [18.6, 1.4], land: [16.6, 0.9], arc: 2.2,
+      desc: "The opposite hides at the left of the net during serve receive, then switches to the right side. The setter faces zone 4 and sets backward, so the block reads it late.",
+      points: ["The opposite's switch starts as soon as the serve crosses the net.", "Setter's hips face the left pin on every set to hide the back set.", "The right-side hitter attacks line or swings sharp toward zone 5."],
+      attack: {
+        OPP: { c: [8.45, 8.3], tc: 3.0, way: [[1.1, 6.9, 5.0]], start: [5.8, 8.9] },
+        MB:  { c: [8.5, 5.0], tc: 2.32, start: [6.1, 4.7] },
+        OH1: { c: [8.3, 1.0], tc: 2.95, way: [[1.05, 5.0, 4.0], [2.1, 5.4, 0.2]] },
+        OH2: { c: [5.6, 4.1], tc: 3.05, start: [3.1, 4.1] },
+      },
+    },
+  ];
+
+  // Build per-player routes, ball segments and blocker motion for a play.
+  function build(p) {
+    const hit = p.attack[p.to];
+    const tc = hit.tc;
+    const end = tc + 1.7;
+    const routes = {};
+    for (const id in FORM) {
+      const [fx, fy] = FORM[id];
+      const k = [[0, fx, fy]];
+      const holdUntil = id === p.passer ? PASS_T + 0.05 : 0.18;
+      k.push([holdUntil, fx, fy]);
+      const a = p.attack[id];
+      if (a) {
+        (a.way || []).forEach(w => { if (w[0] > holdUntil) k.push(w); });
+        const appr = a.approach || 0.8;
+        const st = a.start || [a.c[0] - 2.6, a.c[1]];
+        const tStart = Math.max(a.tc - appr, k[k.length - 1][0] + 0.25);
+        k.push([tStart, st[0], st[1]]);
+        k.push([a.tc, a.c[0], a.c[1]]);
+        k.push([a.tc + 0.55, a.c[0] - 0.7, a.c[1]]);
+        k.push([end, a.c[0] - 0.9, a.c[1]]);
+      } else if (id === "S") {
+        k.push([SET_T - 0.1, TARGET[0], TARGET[1]]);
+        k.push([tc + 0.3, TARGET[0], TARGET[1]]);
+        k.push([end, TARGET[0] - 0.8, (TARGET[1] + hit.c[1]) / 2]);
+      } else if (id === "L" || id === "OH2" || id === "OH1") {
+        // coverage: move behind the hitter
+        const cy = Math.min(8.2, Math.max(0.8, hit.c[1] + (fy < hit.c[1] ? -0.9 : 0.9)));
+        k.push([tc - 0.25, Math.max(4.6, hit.c[0] - 2.6), cy]);
+        k.push([end, Math.max(4.6, hit.c[0] - 2.6), cy]);
+      }
+      k.sort((a, b) => a[0] - b[0]);
+      routes[id] = k;
+    }
+    const passerAt = at(routes[p.passer], PASS_T);
+    const passC = [passerAt[0] + 0.25, passerAt[1]];
+    const balls = [
+      { kind: "serve", t0: 0, t1: PASS_T, a: p.serve, b: passC, h0: 2.8, h1: 0.8, arc: 1.6 },
+      { kind: "pass", t0: PASS_T, t1: SET_T, a: passC, b: [TARGET[0] + 0.2, TARGET[1] - 0.1], h0: 0.8, h1: 2.6, arc: 3.2 },
+      { kind: "set", t0: SET_T, t1: tc, a: [TARGET[0] + 0.2, TARGET[1] - 0.1], b: [hit.c[0] + 0.15, hit.c[1]], h0: 2.6, h1: 3.1, arc: p.arc },
+      { kind: "attack", t0: tc, t1: tc + 0.38, a: [hit.c[0] + 0.15, hit.c[1]], b: p.land, h0: 3.1, h1: 0, arc: 0 },
+    ];
+    // blockers: read the set at SET_T + 0.15, move ~4.5 m/s toward hitter
+    const B0 = [[9.5, 1.5], [9.5, 4.5], [9.5, 7.5]];
+    const react = SET_T + 0.15;
+    const blockers = B0.map(([bx, by], i) => {
+      const dist = hit.c[1] - by;
+      let reach;
+      if (i === 1) reach = Math.sign(dist) * Math.min(Math.abs(dist) * 0.85, Math.max(0, 4.5 * (tc - react)));
+      else {
+        const near = Math.abs(dist) < 2.6;
+        reach = near ? dist * 0.9 : 0;
+      }
+      return [[0, bx, by], [react, bx, by], [Math.max(react + 0.1, tc - 0.05), bx, by + reach], [end, bx, by + reach]];
+    });
+    const phases = [
+      ["Serve", 0, PASS_T, "Ball crosses the net; front-row hitters start to release."],
+      ["Pass", PASS_T, SET_T, `${ROLES[p.passer].name} passes to target as the setter arrives.`],
+      ["Set", SET_T, tc, `Setter delivers to ${ROLES[p.to].name} (${(tc - SET_T).toFixed(2)} s in the air).`],
+      ["Attack", tc, tc + 0.38, "Contact at the top of the jump, ball driven past the block."],
+      ["Cover", tc + 0.38, end, "Teammates close in behind the hitter for a block return."],
+    ];
+    return { routes, balls, blockers, tc, end, phases, hit };
+  }
+
+  // ---------- rendering ----------
+  const Z = 0.22; // how far height lifts the ball on screen, per meter
+  function ballAt(b, t) {
+    const u = Math.min(1, Math.max(0, (t - b.t0) / (b.t1 - b.t0)));
+    const x = b.a[0] + (b.b[0] - b.a[0]) * u;
+    const y = b.a[1] + (b.b[1] - b.a[1]) * u;
+    const z = b.h0 + (b.h1 - b.h0) * u + b.arc * 4 * u * (1 - u);
+    return { x, y, z };
+  }
+  const pathOf = (pts) => pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(3) + "," + p[1].toFixed(3)).join("");
+
+  let P, D, t = 0, playing = true, speed = 0.6, showRoutes = true, last = 0, holdTimer = 0;
+  let playerEls = {}, trailFull = {}, trailNow = {}, blockEls = [], ballEls, ballPathEls = [];
+
+  function mount(play) {
+    P = play; D = build(play); t = 0; holdTimer = 0;
+    gTrails.replaceChildren(); gBallPath.replaceChildren(); gOpp.replaceChildren(); gPlayers.replaceChildren(); gBall.replaceChildren();
+    playerEls = {}; trailFull = {}; trailNow = {}; blockEls = []; ballPathEls = [];
+
+    for (const id in D.routes) {
+      const pts = []; for (let s = 0; s <= 120; s++) pts.push(at(D.routes[id], (s / 120) * D.end));
+      const isHot = id === P.to;
+      trailFull[id] = el("path", { d: pathOf(pts), fill: "none", stroke: isHot ? "#FFD23F" : "#10304F", "stroke-width": isHot ? 0.07 : 0.05, "stroke-dasharray": "0.18 0.14", opacity: 0.45, "marker-end": "url(#arTeam)" }, gTrails);
+      trailNow[id] = el("path", { d: "", fill: "none", stroke: isHot ? "#FFD23F" : "#10304F", "stroke-width": isHot ? 0.12 : 0.05, "stroke-linecap": "round", "stroke-linejoin": "round", opacity: isHot ? 0.95 : 0.5 }, gTrails);
+    }
+    D.balls.forEach(b => {
+      if (b.kind === "serve") return;
+      const pts = []; for (let s = 0; s <= 40; s++) { const q = ballAt(b, b.t0 + (s / 40) * (b.t1 - b.t0)); pts.push([q.x, q.y - q.z * Z]); }
+      const style = b.kind === "attack" ? { stroke: "#C8102E", "stroke-width": 0.1, "marker-end": "url(#arAtk)" }
+        : b.kind === "set" ? { stroke: "#FFFFFF", "stroke-width": 0.07, "marker-end": "url(#arSet)" }
+        : { stroke: "#13385C", "stroke-width": 0.06, "stroke-dasharray": "0.05 0.12", "stroke-linecap": "round", "marker-end": "url(#arPass)" };
+      ballPathEls.push({ b, n: el("path", { d: pathOf(pts), fill: "none", ...style }, gBallPath) });
+    });
+
+    D.blockers.forEach(() => {
+      const g = el("g", {}, gOpp);
+      const arms = el("rect", { x: -0.12, y: -0.55, width: 0.24, height: 1.1, rx: 0.1, fill: "#A12C25", opacity: 0 }, g);
+      el("circle", { r: 0.36, fill: "#A12C25", stroke: "#FFFFFF", "stroke-width": 0.05 }, g);
+      g.appendChild(T(0, 0.12, "B", 0.34, { fill: "#FFFFFF" }));
+      blockEls.push({ g, arms });
+    });
+
+    for (const id in D.routes) {
+      const g = el("g", {}, gPlayers);
+      const ring = el("circle", { r: 0.58, fill: "none", stroke: "#FFD23F", "stroke-width": 0.09, opacity: id === P.to ? 1 : 0 }, g);
+      const body = el("circle", { r: 0.44, fill: id === "L" ? "#F2F2F2" : "#10304F", stroke: "#FFFFFF", "stroke-width": 0.05 }, g);
+      const lab = T(0, 0.11, ROLES[id].label, ROLES[id].label.length > 2 ? 0.28 : 0.34, { fill: id === "L" ? "#10304F" : "#FFFFFF" });
+      g.appendChild(lab);
+      playerEls[id] = { g, ring, body };
+    }
+
+    const shadow = el("ellipse", { rx: 0.2, ry: 0.11, fill: "#000", opacity: 0.25 }, gBall);
+    const ball = el("g", {}, gBall);
+    const bc = el("circle", { r: 0.2, fill: "#F6D13B", stroke: "#1B4E8C", "stroke-width": 0.05 }, ball);
+    const seam = el("path", { d: "M-0.17,-0.06 Q0,0.1 0.17,-0.06 M-0.06,-0.18 Q0.04,0 -0.06,0.18", fill: "none", stroke: "#1B4E8C", "stroke-width": 0.035 }, ball);
+    ballEls = { shadow, ball };
+
+    // text panels
+    document.getElementById("pname").textContent = P.name;
+    document.getElementById("pcall").textContent = P.call;
+    document.getElementById("pdesc").textContent = P.desc;
+    document.getElementById("ppoints").replaceChildren(...P.points.map(s => { const li = document.createElement("li"); li.textContent = s; return li; }));
+    document.getElementById("phases").replaceChildren(...D.phases.map(([n, a, b, d]) => {
+      const li = document.createElement("li");
+      li.innerHTML = `<span class="t">${a.toFixed(2)}–${b.toFixed(2)}s</span><div><b></b><span class="d"></span></div>`;
+      li.querySelector("b").textContent = n; li.querySelector(".d").textContent = d;
+      return li;
+    }));
+    scrub.max = D.end.toFixed(2);
+    document.querySelectorAll(".tab").forEach(b => b.setAttribute("aria-pressed", b.dataset.id === P.id ? "true" : "false"));
+    gTrails.style.display = showRoutes ? "" : "none";
+    draw();
+  }
+
+  function draw() {
+    for (const id in D.routes) {
+      const [x, y] = at(D.routes[id], t);
+      const pe = playerEls[id];
+      const a = P.attack[id];
+      // little "jump" pop around contact time
+      let sc = 1;
+      if (a) { const d = Math.abs(t - a.tc); if (d < 0.3) sc = 1 + 0.22 * (1 - d / 0.3); }
+      pe.g.setAttribute("transform", `translate(${x.toFixed(3)},${y.toFixed(3)}) scale(${sc.toFixed(3)})`);
+      if (showRoutes) {
+        const pts = []; const n = Math.max(2, Math.round((t / D.end) * 120));
+        for (let s = 0; s <= n; s++) pts.push(at(D.routes[id], (s / n) * t));
+        trailNow[id].setAttribute("d", pathOf(pts));
+      }
+    }
+    D.blockers.forEach((k, i) => {
+      const [x, y] = at(k, t);
+      const be = blockEls[i];
+      const d = Math.abs(t - D.tc);
+      const up = d < 0.35 ? 1 - d / 0.35 : 0;
+      be.g.setAttribute("transform", `translate(${x.toFixed(3)},${y.toFixed(3)}) scale(${(1 + up * 0.15).toFixed(3)})`);
+      be.arms.setAttribute("opacity", (up * 0.9).toFixed(2));
+      be.arms.setAttribute("x", (-0.12 - up * 0.3).toFixed(3));
+    });
+    // ball
+    let seg = D.balls.find(b => t >= b.t0 && t <= b.t1) || D.balls[D.balls.length - 1];
+    if (t < D.balls[0].t0) seg = D.balls[0];
+    const q = ballAt(seg, t);
+    const rr = 1 + q.z * 0.05;
+    ballEls.shadow.setAttribute("cx", q.x.toFixed(3)); ballEls.shadow.setAttribute("cy", q.y.toFixed(3));
+    ballEls.shadow.setAttribute("opacity", (0.32 - q.z * 0.025).toFixed(3));
+    ballEls.ball.setAttribute("transform", `translate(${q.x.toFixed(3)},${(q.y - q.z * Z).toFixed(3)}) scale(${rr.toFixed(3)}) rotate(${(t * 520) % 360})`);
+    ballPathEls.forEach(({ b, n }) => n.setAttribute("opacity", showRoutes ? (t >= b.t0 ? 0.95 : 0.3) : 0));
+
+    // UI
+    scrub.value = t.toFixed(2);
+    clock.textContent = `${t.toFixed(2)} s`;
+    document.querySelectorAll("#phases li").forEach((li, i) => {
+      const [, a, b] = D.phases[i]; li.classList.toggle("on", t >= a && (t < b || (i === D.phases.length - 1 && t >= b)));
+    });
+  }
+
+  function frame(now) {
+    const dt = last ? Math.min(0.05, (now - last) / 1000) : 0; last = now;
+    if (playing) {
+      if (t >= D.end) {
+        holdTimer += dt;
+        if (holdTimer > 1.2) { t = 0; holdTimer = 0; }
+      } else t = Math.min(D.end, t + dt * speed);
+      draw();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- controls ----------
+  const tabs = document.getElementById("tabs");
+  const scrub = document.getElementById("scrub");
+  const clock = document.getElementById("clock");
+  const playBtn = document.getElementById("play");
+  PLAYS.forEach(p => {
+    const b = document.createElement("button");
+    b.className = "tab"; b.type = "button"; b.dataset.id = p.id;
+    b.innerHTML = `<span></span><small></small>`;
+    b.querySelector("span").textContent = p.name;
+    b.querySelector("small").textContent = ROLES[p.to].label;
+    b.addEventListener("click", () => { mount(p); remember(p.id); });
+    tabs.appendChild(b);
+  });
+  const setPlaying = v => { playing = v; playBtn.textContent = v ? "Pause" : "Play"; };
+  playBtn.addEventListener("click", () => { if (!playing && t >= D.end) t = 0; setPlaying(!playing); });
+  document.getElementById("restart").addEventListener("click", () => { t = 0; holdTimer = 0; setPlaying(true); draw(); });
+  scrub.addEventListener("input", () => { t = parseFloat(scrub.value); setPlaying(false); draw(); });
+  document.getElementById("speed").addEventListener("change", e => { speed = parseFloat(e.target.value); });
+  document.getElementById("routes").addEventListener("change", e => {
+    showRoutes = e.target.checked; gTrails.style.display = showRoutes ? "" : "none"; draw();
+  });
+  document.addEventListener("keydown", e => {
+    if (e.code === "Space" && !/INPUT|SELECT|BUTTON/.test(document.activeElement.tagName)) { e.preventDefault(); playBtn.click(); }
+  });
+  function remember(id) { try { localStorage.setItem("vb-play", id); } catch (_) {} }
+  let startId = "four";
+  try { startId = localStorage.getItem("vb-play") || startId; } catch (_) {}
+  mount(PLAYS.find(p => p.id === startId) || PLAYS[0]);
+
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    setPlaying(false); t = D.tc; draw();
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
