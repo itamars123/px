@@ -2,9 +2,11 @@
 """Builds StealATreasure.rbxlx from src/ without needing Rojo.
 
 Mirrors default.project.json:
-  src/shared  -> ReplicatedStorage.Shared          (ModuleScripts)
-  src/server  -> ServerScriptService.Server        (*.server.lua = Script)
-  src/client  -> StarterPlayer.StarterPlayerScripts.Client (*.client.lua = LocalScript)
+  src/ReplicatedFirst            -> ReplicatedFirst            (*.client.luau = LocalScript)
+  src/ReplicatedStorage/Shared   -> ReplicatedStorage.Shared   (ModuleScripts)
+  src/ServerScriptService        -> ServerScriptService        (*.server.luau = Script)
+  src/StarterPlayerScripts/Client-> StarterPlayer.StarterPlayerScripts.Client
+*.txt files become StringValues (used for the ProfileStore licence).
 
 Usage:  python3 tools/build_place.py
 """
@@ -34,32 +36,42 @@ def item(cls, name, children="", source=None, extra=""):
     return f'<Item class="{cls}" referent="{ref()}"><Properties>{props}</Properties>{children}</Item>\n'
 
 
+def strip(name, *suffixes):
+    for s in suffixes:
+        if name.endswith(s):
+            return name[: -len(s)]
+    return name
+
+
 def build_dir(path):
     out = ""
     for entry in sorted(os.listdir(path)):
         full = os.path.join(path, entry)
         if os.path.isdir(full):
             out += item("Folder", entry, build_dir(full))
-        elif entry.endswith(".lua"):
-            src = open(full, encoding="utf-8").read()
-            if entry.endswith(".server.lua"):
-                out += item("Script", entry[: -len(".server.lua")], source=src)
-            elif entry.endswith(".client.lua"):
-                out += item("LocalScript", entry[: -len(".client.lua")], source=src)
-            else:
-                out += item("ModuleScript", entry[: -len(".lua")], source=src)
+            continue
+        text = open(full, encoding="utf-8").read()
+        if entry.endswith((".server.luau", ".server.lua")):
+            out += item("Script", strip(entry, ".server.luau", ".server.lua"), source=text)
+        elif entry.endswith((".client.luau", ".client.lua")):
+            out += item("LocalScript", strip(entry, ".client.luau", ".client.lua"), source=text)
+        elif entry.endswith((".luau", ".lua")):
+            out += item("ModuleScript", strip(entry, ".luau", ".lua"), source=text)
+        elif entry.endswith(".txt"):
+            out += item("StringValue", strip(entry, ".txt"), extra=f'<string name="Value">{escape(text)}</string>')
     return out
 
 
 def main():
     src = os.path.join(ROOT, "src")
     body = ""
-    body += item("ReplicatedStorage", "ReplicatedStorage", item("Folder", "Shared", build_dir(os.path.join(src, "shared"))))
-    body += item("ServerScriptService", "ServerScriptService", item("Folder", "Server", build_dir(os.path.join(src, "server"))))
+    body += item("ReplicatedFirst", "ReplicatedFirst", build_dir(os.path.join(src, "ReplicatedFirst")))
+    body += item("ReplicatedStorage", "ReplicatedStorage", item("Folder", "Shared", build_dir(os.path.join(src, "ReplicatedStorage", "Shared"))))
+    body += item("ServerScriptService", "ServerScriptService", build_dir(os.path.join(src, "ServerScriptService")))
     body += item(
         "StarterPlayer",
         "StarterPlayer",
-        item("StarterPlayerScripts", "StarterPlayerScripts", item("Folder", "Client", build_dir(os.path.join(src, "client")))),
+        item("StarterPlayerScripts", "StarterPlayerScripts", item("Folder", "Client", build_dir(os.path.join(src, "StarterPlayerScripts", "Client")))),
     )
     body += item("Workspace", "Workspace", extra='<bool name="StreamingEnabled">false</bool>')
     # Future lighting = real-time shadows from every light, reflections and bloom

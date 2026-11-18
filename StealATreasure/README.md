@@ -109,54 +109,89 @@ To rebuild the place file after you edit the code, run `python3 tools/build_plac
 
 ---
 
-## 🗂️ Project structure
+## 🗂️ Project structure (rebuilt with the `roblox-game` skill)
 
 ```
 src/
-├─ shared/            (ReplicatedStorage.Shared)
-│  ├─ Config.lua          all tuning values
-│  ├─ Rarities.lua        8 rarity tiers + effect rules
-│  ├─ TreasureData.lua    112 treasures (108 collectable + 4 rebirth exclusives), personalities, auras
-│  ├─ TreasureModels.lua  procedural 3D models (25 shapes) + faces + particle/beam/halo/orbit FX
-│  ├─ Motion.lua          deterministic roaming path shared by server (validation) and clients
-│  ├─ PetData.lua         52 pets, 25 species, 4 eggs, luck-weighted rolls
-│  ├─ PetModels.lua       procedural pet builder with animatable parts
-│  ├─ AchievementData.lua 25 achievements
-│  ├─ UpgradeData.lua     shop upgrades, abilities, derived stats
-│  ├─ Remotes.lua         RemoteEvent/RemoteFunction declarations
-│  └─ Util.lua            number formatting, deep copy, uid
-├─ server/            (ServerScriptService.Server)
-│  ├─ Main.server.lua     boots services in order
-│  └─ Services/
-│     ├─ NetService         single validated, rate-limited request entry point
-│     ├─ DataService        DataStore load/save, session locking, autosave, BindToClose
-│     ├─ MapBuilder         the whole world (terrain, plaza, base slots, secrets, events)
-│     ├─ MapDetails         lake, hills, forests, windmills, shops, portals, animated tags
-│     ├─ WorldService       day/night clock, weather, chests, portals, event coins
-│     ├─ PetService         hatching, equipping, pet bonuses
-│     ├─ AchievementService achievements + gem rewards
-│     ├─ BaseService        bases, platforms, door barrier, lock, alarm, sign
-│     ├─ CarryService       carrying, pose, delivery, drop/return
-│     ├─ TreasureService    world spawns, market, give/place/store/sell, secrets, magnet
-│     ├─ StealService       steal validation, alarm, transfer, lockdown, Bonk Hammer
-│     ├─ EconomyService     passive income, XP/levels, offline earnings
-│     ├─ StateService       debounced state replication to clients
-│     ├─ PlayerService      leaderstats, spawning, overhead tag, trails, settings
-│     ├─ ShopService        upgrades + abilities
-│     ├─ RebirthService     rebirth + milestone rewards
-│     ├─ TradeService       trading
-│     ├─ LeaderboardService global OrderedDataStore boards + physical board
-│     └─ EventService       Golden Hour, Meteor Shower, Treasure Rain, Divine Descent
-└─ client/            (StarterPlayerScripts.Client)
-   ├─ Main.client.lua     builds UI, responsive scaling, starts controllers
-   ├─ Controllers/        State, Sound, WorldFX (effects/prompts), TreasureAnimator,
-   │                      Emotes, PetFollower, Ambience, Music, Cinematic, Input
-   └─ UI/                 Lib, Windows, HUD, Notifications, Preview, and the
-                          Inventory, Pets, Index, Upgrades, Gem Shop, Rebirth,
-                          Leaderboard, Achievements, Settings and Trade windows
+├─ ReplicatedFirst/
+│  └─ LoadingScreen.client.luau   custom loading screen (progress, tips, fade)
+├─ ReplicatedStorage/Shared/      shared content + definitions (no yields at require, SE-8)
+│  ├─ Config, Remotes, Util, Rarities, Mutations, Motion
+│  ├─ TreasureData, TreasureModels   112 treasures, procedural models + faces + FX
+│  ├─ PetData, PetModels             52 pets, 4 eggs
+│  └─ UpgradeData, AchievementData
+├─ ServerScriptService/
+│  ├─ Main.server.luau            bootstrap: Init all → Start all → Scheduler.Start
+│  ├─ Packages/ProfileStore.luau  session-locked saving (Apache-2.0, MadStudio/loleris)
+│  ├─ Modules/
+│  │  ├─ RemoteValidator          schema validation (types, ranges, NaN, sizes, extra args)
+│  │  ├─ Scheduler                one consolidated Heartbeat for every periodic job
+│  │  └─ Trove                    per-player connection cleanup (SE-4)
+│  └─ Services/                   Net, Data, Map(+Details), State, Economy, Base, Carry,
+│                                 Treasure, Steal, Player, Gear, Pet, Achievement, World,
+│                                 Shop, Rebirth, Monetization, Trade, Leaderboard, Event
+└─ StarterPlayerScripts/Client/
+   ├─ Main.client.luau            waits for Shared + Remotes, then boots controllers/UI
+   ├─ Controllers/                State, Sound, WorldFX, TreasureAnimator, Emotes,
+   │                              PetFollower, Ambience, Music, Cinematic, Input
+   └─ UI/                         Lib, Windows, HUD, Notifications, Preview + 10 windows
 ```
 
----
+### How the skill's rules are applied
+| Skill rule | Implementation |
+|---|---|
+| **SE-1** session locking | `DataService` on **ProfileStore**: `StartSessionAsync`, `Reconcile`, `EndSession` on leave; shutdown handled by ProfileStore; schema `Version` + migrations; one-time import of older saves |
+| **SE-2** server currency | the client only sends intent; prices, rolls, rewards and transfers are server-side |
+| **SE-3** ProcessReceipt | `MonetizationService`: grant once, store the `PurchaseId`, return `PurchaseGranted` only after it's saved |
+| **SE-4** leaks | per-player `Trove`, cleaned on leave |
+| **SE-5** flooding | global per-player rate limit + per-action cooldowns; 25 malformed requests = kick |
+| **SE-8** yielding requires | `Remotes.Init()` lifecycle; modules index `ReplicatedStorage.Shared` directly; only entry scripts wait |
+| Validation | 33 actions, each with a schema; extra arguments rejected; suspicious requests logged with name + UserId |
+| Movement exploits | server movement guard rubber-bands speed hacks and teleports (grace windows for dash/grapple/knockback/portals) |
+| Performance | one Heartbeat scheduler on the server; client-side animation of treasures, pets, emotes and ambience |
+
+## 💸 Monetization (off until you add IDs)
+Create Game Passes / Developer Products in the Creator Dashboard and paste the IDs into `Config.Monetization`. Items with `Id = 0` stay hidden.
+
+| Type | Item | Effect |
+|---|---|---|
+| Pass | 2x Money | permanent double income |
+| Pass | VIP | VIP title, +1 pet slot, +25% luck |
+| Pass | Big Backpack | carry +1 treasure |
+| Product | 500 / 2,500 Gems | gems |
+| Product | 2x Money (30 min) | timed boost |
+
+## ✅ Integration test checklist (offline mode — run in Studio)
+1. Game Settings → Security → **Enable Studio Access to API Services**, then press **Play**.
+   - [ ] The loading screen shows and fades. The Output shows `[STEAL A TREASURE] Server ready` with no red errors.
+2. Buying from the parade:
+   - [ ] A treasure walks the parade. Hold **E** to buy it: money goes down and the treasure walks to a stand in your base.
+   - [ ] The stand's green plate fills with cash. Stepping on it adds the money.
+3. Stealing (*Test → Clients and Servers*, 2 players):
+   - [ ] Player 2 holds **E** on Player 1's treasure: the alarm fires and the treasure is carried.
+   - [ ] Bonking the thief returns the treasure.
+   - [ ] Delivering it to the thief's base transfers it and auto-locks the victim's base.
+4. Base lock:
+   - [ ] Lock your base. The doors close and the laser blocks others, but you can walk through.
+5. Shop, pets and rebirth:
+   - [ ] Buy an upgrade, a gear item and a pet egg.
+   - [ ] Equip a pet: it follows you.
+   - [ ] Rebirth is blocked until both its requirements are met.
+6. Trading:
+   - [ ] Trade a treasure and a pet between the 2 test players. Both inventories update and nothing is duplicated.
+7. Saving:
+   - [ ] Leave and rejoin: money, treasures, pets and upgrades persist.
+8. Events:
+   - [ ] Settings → Studio test → start each event and check its banner, sky tint and spawns.
+9. Output window:
+   - [ ] No `Infinite yield possible` warnings and no `attempt to index nil` errors.
+
+## 🚀 Publish checklist
+- [ ] Game Settings → Places → **Max Players 8** (one base each).
+- [ ] Set real IDs in `Config.Monetization` (or leave them at 0).
+- [ ] Optional: set `Config.Sounds.Music` to a licensed track (the built-in procedural soundtrack is used otherwise).
+- [ ] Test on a phone using Studio's Device Emulator. Settings → Performance Mode is available for low-end devices.
+- [ ] Make sure the egg odds shown in the Pets → Eggs tab match `PetData.Eggs`. Roblox requires odds disclosure for paid random items.
 
 ## 🔐 Server-side validation
 

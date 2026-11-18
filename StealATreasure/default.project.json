@@ -2,20 +2,21 @@
   "name": "StealATreasure",
   "tree": {
     "$className": "DataModel",
+    "ReplicatedFirst": {
+      "$path": "src/ReplicatedFirst"
+    },
     "ReplicatedStorage": {
       "Shared": {
-        "$path": "src/shared"
+        "$path": "src/ReplicatedStorage/Shared"
       }
     },
     "ServerScriptService": {
-      "Server": {
-        "$path": "src/server"
-      }
+      "$path": "src/ServerScriptService"
     },
     "StarterPlayer": {
       "StarterPlayerScripts": {
         "Client": {
-          "$path": "src/client"
+          "$path": "src/StarterPlayerScripts/Client"
         }
       }
     },
