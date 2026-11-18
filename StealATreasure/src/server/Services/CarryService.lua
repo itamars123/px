@@ -86,7 +86,7 @@ function CarryService.Add(player: Player, item)
 	if not def or not hrp then
 		return false
 	end
-	local model = TreasureModels.Build(def, { Scale = CARRY_SCALE, CFrame = hrp.CFrame, Anchored = false })
+	local model = TreasureModels.Build(def, { Scale = CARRY_SCALE, CFrame = hrp.CFrame, Anchored = false, Mutation = item.Mut })
 	model.Name = "Carried_" .. def.Id
 	model:SetAttribute("Carried", true)
 	model.Parent = char
@@ -137,7 +137,7 @@ function CarryService.DropAll(player: Player, position: Vector3?)
 		if item.Source == "Steal" then
 			S.StealService.Return(item, "dropped")
 		elseif item.Source == "Market" then
-			S.TreasureService.Give(player, item.Id, { Silent = true, NoAutoPlace = true })
+			S.TreasureService.Give(player, item.Id, { Silent = true, NoAutoPlace = true, Mutation = item.Mut })
 		else
 			if position then
 				S.TreasureService.DropToWorld(item.Id, position, item.Source)
@@ -153,7 +153,7 @@ local function deposit(player: Player)
 		if item.Source == "Steal" then
 			S.StealService.Complete(player, item)
 		else
-			S.TreasureService.Give(player, item.Id, { Source = item.Source })
+			S.TreasureService.Give(player, item.Id, { Source = item.Source, Mutation = item.Mut })
 		end
 	end
 end

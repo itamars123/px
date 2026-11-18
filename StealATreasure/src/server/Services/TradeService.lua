@@ -31,7 +31,7 @@ local function view(trade, player: Player)
 		for _, uid in ipairs(trade.Offers[p].Uids) do
 			local t = data and data.Treasures[uid]
 			if t then
-				table.insert(items, { Uid = uid, Id = t.Id })
+				table.insert(items, { Uid = uid, Id = t.Id, Mut = t.Mut })
 			end
 		end
 		local pets = {}
@@ -150,7 +150,7 @@ local function execute(trade)
 	for _, pair in ipairs({ { trade.A, aData }, { trade.B, bData } }) do
 		local p, data = pair[1], pair[2]
 		for _, uid in ipairs(trade.Offers[p].Uids) do
-			table.insert(moving[p], data.Treasures[uid].Id)
+			table.insert(moving[p], { Id = data.Treasures[uid].Id, Mut = data.Treasures[uid].Mut })
 			data.Treasures[uid] = nil
 		end
 		for _, uid in ipairs(trade.Offers[p].Pets) do
@@ -167,13 +167,13 @@ local function execute(trade)
 			end
 			data.Pets[uid] = { Id = id, Equipped = false }
 		end
-		for _, id in ipairs(ids) do
+		for _, item in ipairs(ids) do
 			local uid = Util.NewUid()
 			while data.Treasures[uid] do
 				uid = Util.NewUid()
 			end
-			data.Treasures[uid] = { Id = id, Plot = nil }
-			data.Index[id] = true
+			data.Treasures[uid] = { Id = item.Id, Plot = nil, Mut = item.Mut }
+			data.Index[item.Id] = true
 		end
 		data.Money += money
 		data.Stats.Trades += 1

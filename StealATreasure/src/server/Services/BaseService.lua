@@ -13,6 +13,7 @@ local UpgradeData = require(Shared.UpgradeData)
 local Rarities = require(Shared.Rarities)
 local Util = require(Shared.Util)
 local Remotes = require(Shared.Remotes)
+local Mutations = require(Shared.Mutations)
 local CollectionService = game:GetService("CollectionService")
 
 local S -- services table
@@ -274,7 +275,12 @@ local function buildShell(index: number, cf: CFrame, parent: Instance)
 		lockBB.Name = "LockedLabel"
 		lockBB.MaxDistance = 80
 		lockLabel.Text = "🔒"
-		plotParts[i] = { Plot = plot, Rim = rim, LockBB = lockBB }
+		-- collect plate: step on it to grab the cash this stand has earned
+		local plate = part(plots, Vector3.new(5, 0.35, 1.7), L(lp.X, 1.2 + lp.Y, lp.Z - 3.95), Color3.fromRGB(70, 230, 110), Enum.Material.Neon, { Name = "Plate" .. i, CanCollide = false, CanTouch = true })
+		plate:SetAttribute("Plot", i)
+		local plateBB, plateLabel = S.MapBuilder.Billboard(plate, "", Color3.fromRGB(140, 255, 150), UDim2.fromOffset(110, 30), 1.4)
+		plateBB.MaxDistance = 60
+		plotParts[i] = { Plot = plot, Rim = rim, LockBB = lockBB, Plate = plate, PlateLabel = plateLabel }
 	end
 
 	local treasures = Instance.new("Folder")
@@ -379,16 +385,56 @@ function BaseService.SetColor(player: Player, index)
 end
 
 -- Collector pad --------------------------------------------------------------
+-- Collects everything: the vault (offline income) and every stand's plate.
 function BaseService.Collect(player: Player)
 	local data = S.DataService.Get(player)
-	if not data or (data.Vault or 0) < 1 then
+	if not data then
 		return
 	end
-	local amount = math.floor(data.Vault)
-	data.Vault -= amount
+	local amount = math.floor(data.Vault or 0)
+	data.Vault = (data.Vault or 0) - amount
+	for key, v in pairs(data.PlotCash) do
+		local whole = math.floor(v)
+		amount += whole
+		data.PlotCash[key] = v - whole
+	end
+	if amount < 1 then
+		return
+	end
 	S.EconomyService.AddMoney(player, amount)
 	Remotes.Effect:FireClient(player, "Collect", amount)
 	S.StateService.MarkFull(player)
+	BaseService.UpdatePlates(player)
+end
+
+-- Collects one stand's plate (stepping on it).
+function BaseService.CollectPlot(player: Player, plot: number)
+	local data = S.DataService.Get(player)
+	if not data then
+		return
+	end
+	local key = tostring(plot)
+	local amount = math.floor(data.PlotCash[key] or 0)
+	if amount < 1 then
+		return
+	end
+	data.PlotCash[key] -= amount
+	S.EconomyService.AddMoney(player, amount)
+	Remotes.Effect:FireClient(player, "Collect", amount)
+	BaseService.UpdatePlates(player)
+end
+
+function BaseService.UpdatePlates(player: Player)
+	local base = BaseService.Get(player)
+	local data = S.DataService.Get(player)
+	if not base or not data then
+		return
+	end
+	for i, p in ipairs(base.Plots) do
+		local cash = math.floor(data.PlotCash[tostring(i)] or 0)
+		p.PlateLabel.Text = cash >= 1 and Util.Money(cash) or ""
+		p.Plate.Transparency = (data.AutoCollect or not BaseService.IsPlotUnlocked(data, i)) and 1 or 0
+	end
 end
 
 -- Queries --------------------------------------------------------------------------
@@ -488,7 +534,7 @@ function BaseService.CountStored(data): number
 end
 
 -- Rendering -------------------------------------------------------------------------
-local function makeLabel(root: BasePart, def, height: number)
+local function makeLabel(root: BasePart, def, height: number, mutation: string?)
 	local bb = Instance.new("BillboardGui")
 	bb.Name = "Label"
 	bb.Size = UDim2.fromOffset(180, 54)
@@ -513,7 +559,7 @@ local function makeLabel(root: BasePart, def, height: number)
 	rarity.Font = Enum.Font.GothamBlack
 	rarity.TextScaled = true
 	rarity.TextColor3 = Rarities.Color(def.Rarity)
-	rarity.Text = def.Rarity:upper()
+	rarity.Text = def.Rarity:upper() .. (mutation and ("  " .. Mutations.Label(mutation)) or "")
 	local st2 = Instance.new("UIStroke")
 	st2.Thickness = 2
 	st2.Parent = rarity
@@ -525,7 +571,7 @@ local function makeLabel(root: BasePart, def, height: number)
 	mps.Font = Enum.Font.GothamBold
 	mps.TextScaled = true
 	mps.TextColor3 = Color3.fromRGB(120, 255, 120)
-	mps.Text = Util.Money(def.MPS) .. "/s"
+	mps.Text = Util.Money(def.MPS * Mutations.Multiplier(mutation)) .. "/s"
 	local st3 = Instance.new("UIStroke")
 	st3.Thickness = 2
 	st3.Parent = mps
@@ -587,11 +633,17 @@ function BaseService.Refresh(player: Player)
 			if def then
 				-- rotate so the treasure's face looks toward the door
 				local cf = p.Plot.CFrame * CFrame.new(0, p.Plot.Size.Y / 2, 0) * CFrame.Angles(0, math.pi, 0)
-				local model = TreasureModels.Build(def, { CFrame = cf, Scale = 1 })
+				local model = TreasureModels.Build(def, { CFrame = cf, Scale = 1, Mutation = entry.Mut })
 				model:SetAttribute("Uid", want)
 				model:SetAttribute("OwnerId", player.UserId)
+				-- just bought on the parade: clients animate it walking home
+				local arriving = session.Arriving[want]
+				if arriving then
+					model:SetAttribute("WalkFrom", arriving.From)
+					model:SetAttribute("ArriveAt", arriving.At)
+				end
 				local root = model.PrimaryPart :: BasePart
-				makeLabel(root, def, TreasureModels.Height(def))
+				makeLabel(root, def, TreasureModels.Height(def), entry.Mut)
 				local hold = UpgradeData.StealHold(data)
 				local steal = promptOn(root, "StealPrompt", "Steal", def.Name, hold, "Steal")
 				local store = promptOn(root, "StorePrompt", "Pick Up", def.Name, 0.3, "Store")
@@ -642,6 +694,7 @@ function BaseService.UpdateSign(player: Player)
 	base.Sub.Text = ("💰 %s/s%s"):format(Util.Abbreviate(session.MPS or 0), lockText)
 	local data = S.DataService.Get(player)
 	if data then
+		BaseService.UpdatePlates(player)
 		base.PadLabel.Text = data.AutoCollect and ("🤖 AUTO • %s/s"):format(Util.Abbreviate(session.MPS or 0)) or ("💰 " .. Util.Money(math.floor(data.Vault or 0)) .. "\nstep to collect")
 	end
 end
@@ -837,6 +890,14 @@ function BaseService.Start()
 				BaseService.Collect(who)
 			end
 		end)
+		for j, p in ipairs(base.Plots) do
+			p.Plate.Touched:Connect(function(hit)
+				local who = Players:GetPlayerFromCharacter(hit.Parent)
+				if who and who == base.Owner then
+					BaseService.CollectPlot(who, j)
+				end
+			end)
+		end
 		-- hide the second floor until bought
 		for _, d in ipairs(base.SecondFloor:GetChildren()) do
 			d.Transparency = 1

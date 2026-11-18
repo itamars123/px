@@ -10,6 +10,7 @@ local TreasureData = require(Shared.TreasureData)
 local Rarities = require(Shared.Rarities)
 local Config = require(Shared.Config)
 local Util = require(Shared.Util)
+local Mutations = require(Shared.Mutations)
 
 local T = Lib.Theme
 local new = Lib.new
@@ -27,6 +28,7 @@ local isOpen = false
 
 function Inventory.Card(def, opts)
 	local color = Rarities.Color(def.Rarity)
+	local mut = opts.Mut and Mutations.Info[opts.Mut]
 	local card = new("TextButton", {
 		Name = def.Id,
 		BackgroundColor3 = color,
@@ -36,8 +38,12 @@ function Inventory.Card(def, opts)
 	}, {
 		Lib.corner(12),
 		Lib.gradient(Color3.new(1, 1, 1), Color3.fromRGB(110, 110, 130), 90),
-		Lib.stroke(opts.Selected and T.Accent or color:Lerp(Color3.new(0, 0, 0), 0.4), opts.Selected and 4 or 2),
+		Lib.stroke(opts.Selected and T.Accent or (mut and mut.Color or color:Lerp(Color3.new(0, 0, 0), 0.4)), (opts.Selected or mut) and 4 or 2),
 	})
+	if mut then
+		local tag = Lib.label({ Size = UDim2.fromOffset(26, 26), Position = UDim2.new(1, -28, 0, 2), Text = mut.Icon, MaxText = 20, Parent = card })
+		tag.ZIndex = 3
+	end
 	local icon = Lib.label({
 		Size = UDim2.new(1, 0, 0.5, 0),
 		Position = UDim2.fromScale(0, 0.04),
@@ -59,7 +65,7 @@ function Inventory.Card(def, opts)
 	local sub = Lib.label({
 		Size = UDim2.new(1, -8, 0.18, 0),
 		Position = UDim2.new(0, 4, 0.78, 0),
-		Text = opts.Sub or (Util.Money(def.MPS) .. "/s"),
+		Text = opts.Sub or (Util.Money(def.MPS * Mutations.Multiplier(opts.Mut)) .. "/s"),
 		TextColor3 = Color3.fromRGB(190, 255, 190),
 		MaxText = 13,
 		Parent = card,
@@ -130,13 +136,14 @@ local function refreshDetail()
 	local def = TreasureData.Get(t.Id)
 	cleanupPreview = Preview.Show(detail.Viewport, def)
 	detail.Name.Text = def.Name
-	detail.Rarity.Text = def.Rarity:upper() .. (def.Exclusive and " • EXCLUSIVE" or "")
+	detail.Rarity.Text = def.Rarity:upper() .. (def.Exclusive and " • EXCLUSIVE" or "") .. (t.Mut and ("  " .. Mutations.Label(t.Mut)) or "")
 	detail.Rarity.TextColor3 = Rarities.Color(def.Rarity)
 	local status = t.Stealing and "🚨 BEING STOLEN!" or (t.InTrade and "🤝 In trade" or (t.Plot and ("📍 Platform " .. t.Plot) or "📦 In storage"))
+	local m = Mutations.Multiplier(t.Mut)
 	detail.Info.Text = ("💰 %s/s\n💎 Value %s\n🏷️ Sells for %s\n%s"):format(
-		Util.Money(def.MPS),
-		Util.Money(def.Value),
-		Util.Money(math.floor(def.Value * Config.SellMultiplier)),
+		Util.Money(def.MPS * m),
+		Util.Money(def.Value * m),
+		Util.Money(math.floor(def.Value * m * Config.SellMultiplier)),
 		status
 	)
 	detail.Place.Visible = t.Plot == nil and not t.InTrade
@@ -164,7 +171,7 @@ local function refresh()
 	countLabel.Text = ("📍 %d/%d platforms   📦 %d/%d storage"):format(placed, full.PlotCount, stored, full.MaxStorage)
 	for i, e in ipairs(entries()) do
 		local badge = e.Entry.Stealing and "🚨" or (e.Entry.Plot and "📍" or nil)
-		local card = Inventory.Card(e.Def, { Order = i, Selected = e.Entry.Uid == selectedUid, Badge = badge })
+		local card = Inventory.Card(e.Def, { Order = i, Selected = e.Entry.Uid == selectedUid, Badge = badge, Mut = e.Entry.Mut })
 		card.Activated:Connect(function()
 			selectedUid = e.Entry.Uid
 			refresh()

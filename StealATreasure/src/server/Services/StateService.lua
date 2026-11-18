@@ -13,6 +13,14 @@ local UpgradeData = require(Shared.UpgradeData)
 local Remotes = require(Shared.Remotes)
 local Util = require(Shared.Util)
 
+local function uncollected(data): number
+	local total = data.Vault or 0
+	for _, v in pairs(data.PlotCash or {}) do
+		total += v
+	end
+	return total
+end
+
 local S
 
 local StateService = {}
@@ -42,6 +50,7 @@ local function buildFull(player: Player)
 			Uid = uid,
 			Id = t.Id,
 			Plot = t.Plot,
+			Mut = t.Mut,
 			Stealing = session.Stealing[uid] ~= nil,
 			InTrade = table.find(tradeOffer, uid) ~= nil,
 		})
@@ -65,7 +74,7 @@ local function buildFull(player: Player)
 	return {
 		Money = data.Money,
 		Gems = data.Gems,
-		Vault = data.Vault,
+		Vault = uncollected(data),
 		Pets = pets,
 		PetSlots = UpgradeData.PetSlots(data),
 		Achievements = achievements,
@@ -97,6 +106,8 @@ local function buildFull(player: Player)
 		BaseIndex = session.BaseIndex,
 		Multiplier = UpgradeData.IncomeMultiplier(data, session.Aura, session.PetBonus.Money),
 		RebirthCost = Config.RebirthCost(data.Rebirths),
+		RebirthReq = Config.RebirthRequirement(data.Rebirths),
+		Gear = data.Gear,
 		LockDuration = UpgradeData.LockDuration(data),
 		CanSave = S.DataService.CanSave(),
 	}
@@ -115,7 +126,7 @@ local function buildStats(player: Player)
 	return {
 		Money = data.Money,
 		Gems = data.Gems,
-		Vault = data.Vault,
+		Vault = uncollected(data),
 		Stamina = session.Stamina,
 		MaxStamina = Config.Sprint.MaxStamina,
 		Luck = S.EconomyService.Luck(player),

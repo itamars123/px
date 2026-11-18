@@ -31,6 +31,10 @@ local function refresh()
 	info.Text = ("You have rebirthed %d times.\nCurrent income multiplier: x%.2f\n\nRebirth %d gives: +%d%% total income, +%d walk speed and %s starting cash.\nYou keep: abilities, index, secrets, titles & exclusive treasures.\nYou lose: money, treasures and upgrades.")
 		:format(full.Rebirths, full.Multiplier, nextR, bonus, Config.Rebirth.SpeedBonusPerRebirth, Util.Money(Config.StartingMoney + nextR * Config.Rebirth.StartingMoneyPerRebirth))
 	setProgress(full.Money / cost, ("%s / %s"):format(Util.Money(full.Money), Util.Money(cost)))
+	local req = full.RebirthReq
+	if req then
+		info.Text ..= ("\n\n📌 Also requires: %d × %s+ treasure%s"):format(req.Count, req.Rarity, req.Count > 1 and "s" or "")
+	end
 	local canAfford = full.Money >= cost
 	if os.clock() < confirmUntil then
 		rebirthButton.Text = "⚠️ TAP AGAIN TO CONFIRM"

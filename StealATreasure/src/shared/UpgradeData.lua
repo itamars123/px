@@ -142,6 +142,32 @@ UpgradeData.Abilities = {
 	},
 }
 
+-- Gear: tools bought with money (kept through rebirth).
+UpgradeData.Gear = {
+	Bat = {
+		Order = 1,
+		Name = "Bonk Bat",
+		Icon = "🏏",
+		Levels = { "Wooden Bonk Hammer", "Iron Bat", "Diamond Bat", "Galaxy Bat" },
+		Costs = { 25000, 400000, 6000000 },
+		Description = "Bigger bonks: longer reach, longer stun, bigger knockback.",
+	},
+	SpeedCoil = { Order = 2, Name = "Speed Coil", Icon = "🌀", Cost = 15000, Description = "Hold it to run +6 faster." },
+	Grapple = { Order = 3, Name = "Grapple Hook", Icon = "🪝", Cost = 90000, Description = "Click to zip to a spot up to 90 studs away (4s cooldown)." },
+	Trap = { Order = 4, Name = "Bear Trap", Icon = "🪤", Cost = 60000, Description = "Place up to 3 traps in your base. Thieves get stuck and drop their loot." },
+}
+
+function UpgradeData.BatStats(level: number)
+	level = level or 0
+	return {
+		Name = UpgradeData.Gear.Bat.Levels[level + 1],
+		Range = 9 + level * 2,
+		Stun = 1.2 + level * 0.4,
+		Knock = 60 + level * 20,
+		Color = ({ Color3.fromRGB(255, 80, 90), Color3.fromRGB(170, 175, 185), Color3.fromRGB(120, 230, 255), Color3.fromRGB(150, 80, 255) })[level + 1],
+	}
+end
+
 -- Gem shop: boosts and permanent perks bought with gems.
 UpgradeData.GemShop = {
 	MoneyBoost = { Order = 1, Name = "2x Money (15 min)", Icon = "💸", Cost = 100, Boost = "Money", Duration = 900, Description = "Double all income for 15 minutes." },

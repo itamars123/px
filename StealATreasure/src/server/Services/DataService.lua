@@ -23,10 +23,12 @@ local TEMPLATE = {
 	XP = 0,
 	Level = 1,
 	Gems = Config.Gems.Start,
-	Vault = 0, -- uncollected income waiting on your collector pad
+	Vault = 0, -- offline income waiting on your vault pad
+	PlotCash = {}, -- [tostring(plot)] = cash waiting on that stand's collect plate
 	Upgrades = { Speed = 0, Carry = 0, Base = 0, Protection = 0, Income = 0, Luck = 0, Security = 0, Walls = 0, Floors = 0 },
 	Pets = {}, -- [uid] = { Id = string, Equipped = boolean }
 	ExtraPetSlots = 0,
+	Gear = { Bat = 0, SpeedCoil = false, Grapple = false, Trap = false },
 	AutoCollect = false,
 	Boosts = {}, -- [name] = os.time() expiry
 	Achievements = {}, -- [id] = true
@@ -89,6 +91,7 @@ local function newSession(player: Player)
 		Stamina = Config.Sprint.MaxStamina,
 		Sprinting = false,
 		CameraAlerts = {}, -- [intruder] = last alert clock
+		Arriving = {}, -- [uid] = { From = Vector3, At = serverTime } treasures walking home
 		PetBonus = { Money = 0, Luck = 0, Speed = 0, Gems = 0 },
 		Aura = 0,
 	}

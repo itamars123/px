@@ -25,6 +25,9 @@ function PlayerService.ApplyMovement(player: Player)
 	if #session.Carrying > 0 then
 		speed *= S.CarryService.IsCarryingStolen(player) and 0.85 or 0.95
 	end
+	if session.CoilEquipped then
+		speed += 6
+	end
 	if session.Sprinting and session.Stamina > 0 then
 		speed *= Config.Sprint.Multiplier
 	end
@@ -166,6 +169,7 @@ local function setupCharacter(player: Player, char: Model)
 	PlayerService.UpdateOverhead(player)
 	PlayerService.ApplyTrail(player)
 	S.StealService.GiveHammer(player)
+	S.GearService.GiveTools(player)
 	hum.Died:Connect(function()
 		S.CarryService.OnDied(player, hrp.Position)
 	end)

@@ -8,6 +8,7 @@
 -- animates Root locally (spin / bob) using the "Home" CFrame attribute.
 
 local Rarities = require(script.Parent.Rarities)
+local Mutations = require(script.Parent.Mutations)
 
 local TreasureModels = {}
 
@@ -618,6 +619,40 @@ function TreasureModels.Build(def, opts)
 	local builder = newBuilder(model, root, scale, def)
 	local fn = Shapes[def.Shape] or Shapes.Gem
 	fn(builder)
+	-- Mutation: recolour the body and add a matching aura
+	local mut = opts.Mutation and Mutations.Info[opts.Mutation]
+	if mut then
+		local i = 0
+		for _, p in ipairs(model:GetChildren()) do
+			if p:IsA("BasePart") and p ~= root then
+				i += 1
+				if mut.Rainbow then
+					p.Color = Color3.fromHSV((i * 0.13) % 1, 0.7, 1)
+				elseif p.Material ~= Enum.Material.Neon then
+					p.Color = p.Color:Lerp(mut.Color, 0.75)
+					p.Material = mat(mut.Material)
+					if p.Material == Enum.Material.Glass then
+						p.Transparency = 0.2
+					end
+				end
+			end
+		end
+		local att = Instance.new("Attachment")
+		att.Name = "MutationFx"
+		att.Position = Vector3.new(0, 1.6 * scale, 0)
+		att.Parent = root
+		local e = Instance.new("ParticleEmitter")
+		e.Texture = TEX_SPARKLE
+		e.Color = ColorSequence.new(mut.Color, Color3.new(1, 1, 1))
+		e.LightEmission = 1
+		e.Rate = 12
+		e.Lifetime = NumberRange.new(0.8, 1.4)
+		e.Speed = NumberRange.new(1, 2.5)
+		e.SpreadAngle = Vector2.new(180, 180)
+		e.Size = NumberSequence.new(0.45 * scale, 0)
+		e.Parent = att
+		model:SetAttribute("Mutation", opts.Mutation)
+	end
 	if opts.Face ~= false then
 		addFace(builder)
 	end

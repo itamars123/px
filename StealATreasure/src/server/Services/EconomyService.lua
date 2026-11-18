@@ -10,6 +10,7 @@ local TreasureData = require(Shared.TreasureData)
 local UpgradeData = require(Shared.UpgradeData)
 local Remotes = require(Shared.Remotes)
 local Util = require(Shared.Util)
+local Mutations = require(Shared.Mutations)
 
 local S
 
@@ -84,17 +85,23 @@ function EconomyService.ComputeMPS(player: Player): number
 		return 0
 	end
 	local total, aura = 0, 0
+	local perPlot = {}
 	for uid, t in pairs(data.Treasures) do
-		if t.Plot and not session.Stealing[uid] then
+		if t.Plot and not session.Stealing[uid] and not session.Arriving[uid] then
 			local def = TreasureData.Get(t.Id)
 			if def then
-				total += def.MPS
+				local v = def.MPS * Mutations.Multiplier(t.Mut)
+				total += v
+				perPlot[t.Plot] = v
 				aura += def.Aura or 0
 			end
 		end
 	end
 	session.Aura = aura
-	return total * UpgradeData.IncomeMultiplier(data, aura, session.PetBonus.Money) * EconomyService.EventMultiplier
+	local mult = UpgradeData.IncomeMultiplier(data, aura, session.PetBonus.Money) * EconomyService.EventMultiplier
+	session.PlotIncome = perPlot
+	session.IncomeMult = mult
+	return total * mult
 end
 
 function EconomyService.GrantOffline(player: Player)
@@ -110,7 +117,7 @@ function EconomyService.GrantOffline(player: Player)
 	for _, t in pairs(data.Treasures) do
 		if t.Plot then
 			local def = TreasureData.Get(t.Id)
-			mps += def and def.MPS or 0
+			mps += def and def.MPS * Mutations.Multiplier(t.Mut) or 0
 		end
 	end
 	mps *= UpgradeData.IncomeMultiplier(data)
@@ -140,7 +147,12 @@ function EconomyService.Start()
 						if data.AutoCollect then
 							data.Money += gain
 						else
-							data.Vault = (data.Vault or 0) + gain
+							-- each stand fills up its own collect plate
+							local m = (session.IncomeMult or 1) * Config.IncomeTickSeconds
+							for plot, v in pairs(session.PlotIncome or {}) do
+								local key = tostring(plot)
+								data.PlotCash[key] = (data.PlotCash[key] or 0) + v * m
+							end
 						end
 						data.TotalEarned += gain
 					end

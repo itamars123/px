@@ -243,6 +243,22 @@ local function onEffect(kind: string, a, b)
 	elseif kind == "Confetti" then
 		Notifications.Confetti()
 		Sound.Play("Legendary", 0.6)
+	elseif kind == "Grapple" and hrp and typeof(a) == "Vector3" then
+		local dir = a - hrp.Position
+		hrp.AssemblyLinearVelocity = dir.Unit * math.clamp(dir.Magnitude * 2.2, 60, 160) + Vector3.new(0, 18, 0)
+		local rope = Instance.new("Part")
+		rope.Anchored = true
+		rope.CanCollide = false
+		rope.CanQuery = false
+		rope.Material = Enum.Material.Neon
+		rope.Color = Color3.fromRGB(230, 230, 240)
+		rope.Size = Vector3.new(0.2, 0.2, dir.Magnitude)
+		rope.CFrame = CFrame.lookAt(hrp.Position + dir / 2, a)
+		rope.Parent = workspace
+		TweenService:Create(rope, TweenInfo.new(0.5), { Transparency = 1 }):Play()
+		game:GetService("Debris"):AddItem(rope, 0.6)
+		Sound.Play("Dash", 0.7, 1.3)
+		fovPunch(15, 0.6)
 	elseif kind == "GlobalShake" then
 		shake(a or 0.4, 1.2)
 	elseif kind == "ChestOpen" then
@@ -369,6 +385,34 @@ function WorldFX.Start()
 		Notifications.Toast(text, kind)
 	end)
 	State.StatsChanged.Event:Connect(updateGuide)
+	-- Grapple Hook: the tool asks the server to zip us to where we clicked
+	local function hookTool(tool: Instance)
+		if tool:IsA("Tool") and tool:GetAttribute("Grapple") and not tool:GetAttribute("Hooked") then
+			tool:SetAttribute("Hooked", true)
+			tool.Activated:Connect(function()
+				local mouse = player:GetMouse()
+				local target = mouse.Hit and mouse.Hit.Position
+				if target then
+					State.Request("Grapple", target)
+				end
+			end)
+		end
+	end
+	local function watchContainer(c: Instance?)
+		if not c then
+			return
+		end
+		for _, t in ipairs(c:GetChildren()) do
+			hookTool(t)
+		end
+		c.ChildAdded:Connect(hookTool)
+	end
+	watchContainer(player:FindFirstChildOfClass("Backpack"))
+	player.ChildAdded:Connect(function(c)
+		if c:IsA("Backpack") then
+			watchContainer(c)
+		end
+	end)
 	player.CharacterAdded:Connect(function()
 		guide.A0 = nil
 		if guide.Beam then

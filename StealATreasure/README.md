@@ -6,6 +6,22 @@ The whole game is generated from Luau code: the terrain and map, all 112 treasur
 
 ## ✨ What's in the game
 
+- **Treasure Parade**
+  - Treasures walk along a red carpet through the middle of the map; buy them as they pass by holding **E**.
+  - What you buy walks to your base by itself. It can't be stolen until it reaches its stand.
+- **Base rows**: 4 bases line each side of the parade, and the market plaza sits at the parade's start.
+- **Per-stand cash**
+  - Every stand fills its own green collect plate; step on it to grab the money.
+  - The HUD "Collect" button grabs everything while you're in your base.
+- **Mutations**
+  - Gold ×1.25, Diamond ×1.5, Rainbow ×2, Lava ×2.5 (event only) and Galaxy ×4.
+  - Mutated treasures are recoloured, sparkle, and keep their mutation when stolen or traded.
+  - Lava Eruption and Rainbow Storm events make mutations common.
+- **Gear shop**
+  - Bat tiers (Wooden → Iron → Diamond → Galaxy) give longer reach, longer stun and bigger knockback.
+  - Speed Coil, Grapple Hook, and Bear Traps that catch thieves and make them drop the loot.
+- **Rebirth requirements**: each rebirth also needs certain treasures (e.g. 1 Epic, then 1 Legendary, then 2 Legendary…).
+
 - **World**
   - Real Terrain grass that sways in the wind, plus a lake with a dock, a lighthouse and an island.
   - Rolling hills, border mountains and 3 pine forests with glowing mushrooms.

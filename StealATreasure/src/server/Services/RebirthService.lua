@@ -26,6 +26,17 @@ function RebirthService.Rebirth(player: Player)
 	if #session.Carrying > 0 then
 		return false, "Deliver what you're carrying first"
 	end
+	local req = Config.RebirthRequirement(data.Rebirths)
+	local have = 0
+	for _, t in pairs(data.Treasures) do
+		local d = TreasureData.Get(t.Id)
+		if d and not d.Exclusive and require(Shared.Rarities).Rank(d.Rarity) >= require(Shared.Rarities).Rank(req.Rarity) then
+			have += 1
+		end
+	end
+	if have < req.Count then
+		return false, ("Rebirth %d needs %d %s+ treasure%s (you have %d)"):format(data.Rebirths + 1, req.Count, req.Rarity, req.Count > 1 and "s" or "", have)
+	end
 	if session.Trade then
 		return false, "Finish your trade first"
 	end
@@ -80,6 +91,7 @@ function RebirthService.Rebirth(player: Player)
 	S.PlayerService.ApplyTrail(player)
 	data.Gems += Config.Gems.Rebirth
 	data.Vault = 0
+	data.PlotCash = {}
 	S.PlayerService.Emote(player, "Victory", 5)
 	S.StateService.MarkFull(player)
 	task.spawn(S.DataService.Save, player, false)

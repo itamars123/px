@@ -305,6 +305,17 @@ local function buildPlaza(root: Instance, map)
 	spawn.Duration = 0
 	spawn.Neutral = true
 	spawn.Parent = plaza
+
+	-- the plaza is built around the origin, then moved to the parade's start
+	local offset = CFrame.new(Config.PlazaCenter)
+	for _, d in ipairs(plaza:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.CFrame = offset * d.CFrame
+		end
+	end
+	for _, st in ipairs(map.Stalls) do
+		st.CFrame = offset * st.CFrame
+	end
 end
 
 -- Fields ---------------------------------------------------------------------
@@ -318,8 +329,9 @@ local function buildFields(root: Instance, map)
 	map.Fields = {}
 	local names = { "Sunny Meadow", "Golden Grove", "Crystal Clearing", "Rainbow Patch", "Mushroom Hollow", "Starlight Glade", "Coral Garden", "Lucky Lawn" }
 	for i = 0, 7 do
-		local a = math.rad(22.5 + i * 45)
-		local center = Vector3.new(math.cos(a) * 140, 0, math.sin(a) * 140)
+		local col = Config.BaseColumnsX[i % 4 + 1]
+		local side = i < 4 and 1 or -1
+		local center = Vector3.new(col, 0, side * 190)
 		local m = Instance.new("Model")
 		m.Name = names[i + 1]
 		local color = FLOWER_COLORS[i % #FLOWER_COLORS + 1]
@@ -341,50 +353,111 @@ end
 -- Paths ------------------------------------------------------------------------
 local function buildPaths(root: Instance)
 	local paths = folder("Paths", root)
-	for i = 0, Config.MaxBases - 1 do
-		local a = math.rad(i * 45)
-		local dir = Vector3.new(math.cos(a), 0, math.sin(a))
-		local from, to = dir * 75, dir * (Config.BaseRingRadius - Config.BaseSize / 2)
-		local mid = (from + to) / 2
-		local len = (to - from).Magnitude
-		part(paths, Vector3.new(14, 0.3, len), CFrame.lookAt(mid + Vector3.new(0, 0.15, 0), to + Vector3.new(0, 0.15, 0)), Color3.fromRGB(230, 200, 150), Enum.Material.Sand)
-		part(paths, Vector3.new(16, 0.25, len), CFrame.lookAt(mid + Vector3.new(0, 0.12, 0), to + Vector3.new(0, 0.12, 0)), Color3.fromRGB(190, 160, 120), Enum.Material.Cobblestone)
+	local P = Config.Parade
+	-- wide stone promenades on both sides of the parade
+	for _, side in ipairs({ -1, 1 }) do
+		part(paths, Vector3.new(P.EndX - P.StartX + 40, 0.3, 26), CFrame.new(0, 0.15, side * 22), Color3.fromRGB(205, 190, 165), Enum.Material.Cobblestone)
+		-- short paths from the promenade to every base door
+		for _, x in ipairs(Config.BaseColumnsX) do
+			local z0, z1 = side * 34, side * (Config.BaseRowZ - Config.BaseSize / 2)
+			part(paths, Vector3.new(14, 0.3, math.abs(z1 - z0) + 2), CFrame.new(x, 0.16, (z0 + z1) / 2), Color3.fromRGB(230, 200, 150), Enum.Material.Sand)
+		end
 		-- lamp posts
-		for d = 90, Config.BaseRingRadius - 50, 40 do
-			for _, side in ipairs({ -1, 1 }) do
-				local perp = Vector3.new(-dir.Z, 0, dir.X) * side * 10
-				local p = dir * d + perp
-				part(paths, Vector3.new(0.6, 9, 0.6), CFrame.new(p + Vector3.new(0, 4.5, 0)), Color3.fromRGB(60, 60, 70), Enum.Material.Metal)
-				local bulb = ball(paths, 1.6, p + Vector3.new(0, 9.5, 0), Color3.fromRGB(255, 230, 160), Enum.Material.Neon)
-				local l = Instance.new("PointLight")
-				l.Range = 14
-				l.Brightness = 1
-				l.Color = Color3.fromRGB(255, 220, 150)
-				l.Parent = bulb
-			end
+		for x = P.StartX + 20, P.EndX - 20, 40 do
+			local p = Vector3.new(x, 0, side * 12)
+			part(paths, Vector3.new(0.6, 10, 0.6), CFrame.new(p + Vector3.new(0, 5, 0)), Color3.fromRGB(60, 60, 70), Enum.Material.Metal)
+			local bulb = ball(paths, 1.8, p + Vector3.new(0, 10.5, 0), Color3.fromRGB(255, 230, 160), Enum.Material.Neon)
+			local l = Instance.new("PointLight")
+			l.Range = 18
+			l.Brightness = 1.2
+			l.Color = Color3.fromRGB(255, 220, 150)
+			l.Parent = bulb
 		end
 	end
+	-- road from the plaza to the parade start
+	local plaza = Config.PlazaCenter
+	part(paths, Vector3.new(math.abs(P.StartX - plaza.X) - 60, 0.3, 30), CFrame.new((P.StartX + plaza.X + 60) / 2, 0.15, 0), Color3.fromRGB(230, 200, 150), Enum.Material.Sand)
+end
+
+-- Treasure Parade: the red carpet that treasures walk along (buy them as they pass!)
+local function buildParade(root: Instance, map)
+	local CollectionService = game:GetService("CollectionService")
+	local f = folder("TreasureParade", root)
+	local P = Config.Parade
+	local length = P.EndX - P.StartX
+	local mid = (P.StartX + P.EndX) / 2
+	part(f, Vector3.new(length + 8, 0.6, P.Width + 4), CFrame.new(mid, 0.3, P.Z), Color3.fromRGB(255, 200, 60), Enum.Material.Foil, { Name = "CarpetTrim" })
+	local carpet = part(f, Vector3.new(length + 8, 0.7, P.Width), CFrame.new(mid, 0.35, P.Z), Color3.fromRGB(200, 30, 50), Enum.Material.Fabric, { Name = "Carpet" })
+	-- flowing light along the carpet (animated Beam texture)
+	local a0 = Instance.new("Attachment")
+	a0.Position = Vector3.new(-length / 2, 0.4, 0)
+	a0.Parent = carpet
+	local a1 = Instance.new("Attachment")
+	a1.Position = Vector3.new(length / 2, 0.4, 0)
+	a1.Parent = carpet
+	local beam = Instance.new("Beam")
+	beam.Attachment0 = a0
+	beam.Attachment1 = a1
+	beam.Width0 = P.Width - 2
+	beam.Width1 = P.Width - 2
+	beam.FaceCamera = false
+	beam.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	beam.TextureMode = Enum.TextureMode.Static
+	beam.TextureLength = 10
+	beam.TextureSpeed = P.Speed / 10
+	beam.LightEmission = 0.6
+	beam.Transparency = NumberSequence.new(0.55)
+	beam.Color = ColorSequence.new(Color3.fromRGB(255, 220, 120))
+	beam.Parent = carpet
+	-- velvet rope posts along both edges
+	for x = P.StartX, P.EndX, 12 do
+		for _, side in ipairs({ -1, 1 }) do
+			local pos = Vector3.new(x, 0, P.Z + side * (P.Width / 2 + 2.5))
+			cyl(f, 3.4, 0.5, CFrame.new(pos + Vector3.new(0, 1.7, 0)), Color3.fromRGB(255, 205, 70), Enum.Material.Foil)
+			ball(f, 0.8, pos + Vector3.new(0, 3.6, 0), Color3.fromRGB(255, 220, 90), Enum.Material.Foil)
+		end
+	end
+	-- spawn + exit arches (glowing portals)
+	for _, info in ipairs({ { P.StartX - 6, Color3.fromRGB(120, 220, 255), "✨ TREASURE PARADE ✨" }, { P.EndX + 6, Color3.fromRGB(255, 120, 200), "👋 BYE BYE!" } }) do
+		local x, color = info[1], info[2]
+		part(f, Vector3.new(3, 22, 3), CFrame.new(x, 11, P.Z - P.Width / 2 - 3), Color3.fromRGB(250, 245, 235), Enum.Material.Marble)
+		part(f, Vector3.new(3, 22, 3), CFrame.new(x, 11, P.Z + P.Width / 2 + 3), Color3.fromRGB(250, 245, 235), Enum.Material.Marble)
+		part(f, Vector3.new(4, 3, P.Width + 10), CFrame.new(x, 23, P.Z), color, Enum.Material.SmoothPlastic)
+		local disc = part(f, Vector3.new(0.6, 19, P.Width + 2), CFrame.new(x, 10.5, P.Z), color, Enum.Material.ForceField, { CanCollide = false, Transparency = 0.2 })
+		CollectionService:AddTag(disc, "Pulse")
+		local sp = Instance.new("ParticleEmitter")
+		sp.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		sp.Color = ColorSequence.new(color, Color3.new(1, 1, 1))
+		sp.LightEmission = 1
+		sp.Rate = 30
+		sp.Speed = NumberRange.new(2, 5)
+		sp.SpreadAngle = Vector2.new(180, 180)
+		sp.Size = NumberSequence.new(0.8, 0)
+		sp.Parent = disc
+		local sign = part(f, Vector3.new(1, 1, 1), CFrame.new(x, 28, P.Z), Color3.new(), nil, { Transparency = 1, CanCollide = false, CanQuery = false })
+		billboardText(sign, info[3], color:Lerp(Color3.new(1, 1, 1), 0.3), UDim2.fromOffset(360, 70), 0).MaxDistance = 600
+	end
+	map.Parade = {
+		Start = Vector3.new(P.StartX, 0.7, P.Z),
+		End = Vector3.new(P.EndX, 0.7, P.Z),
+	}
 end
 
 -- Decorations & border ---------------------------------------------------------------
 local function isClear(pos: Vector3, map): boolean
 	local flat = Vector3.new(pos.X, 0, pos.Z)
-	if flat.Magnitude < 90 then
+	-- plaza
+	if (flat - Config.PlazaCenter).Magnitude < 100 then
 		return false
 	end
-	for i = 0, Config.MaxBases - 1 do
-		local a = math.rad(i * 45)
-		local c = Vector3.new(math.cos(a), 0, math.sin(a)) * Config.BaseRingRadius
-		if (flat - c).Magnitude < 62 then
-			return false
-		end
-		-- keep the path corridor free
-		local dir = c.Unit
-		local along = flat:Dot(dir)
-		local perp = (flat - dir * along).Magnitude
-		if along > 0 and along < Config.BaseRingRadius and perp < 16 then
-			return false
-		end
+	-- the whole base district: parade, promenades and both base rows
+	local reach = Config.BaseRowZ + Config.BaseSize / 2 + 18
+	if math.abs(flat.X) < 290 and math.abs(flat.Z) < reach then
+		return false
+	end
+	-- road from the plaza
+	if flat.X < -240 and flat.X > Config.PlazaCenter.X and math.abs(flat.Z) < 25 then
+		return false
 	end
 	for _, f in ipairs(map.Fields) do
 		if (flat - f.Center).Magnitude < 30 then
@@ -675,6 +748,7 @@ function MapBuilder.Build()
 	buildPlaza(root, map)
 	buildFields(root, map)
 	buildPaths(root)
+	buildParade(root, map)
 	buildSecretCave(root, map)
 	buildSkyIsland(root, map)
 	buildVault(root, map)
@@ -688,9 +762,11 @@ function MapBuilder.Build()
 	-- Base slot transforms (BaseService builds the bases themselves)
 	map.BaseSlots = {}
 	for i = 1, Config.MaxBases do
-		local a = math.rad((i - 1) * 45)
-		local pos = Vector3.new(math.cos(a), 0, math.sin(a)) * Config.BaseRingRadius
-		map.BaseSlots[i] = CFrame.lookAt(pos, Vector3.new(0, 0, 0))
+		local col = Config.BaseColumnsX[(i - 1) % 4 + 1]
+		local side = i <= 4 and 1 or -1
+		local pos = Vector3.new(col, 0, side * Config.BaseRowZ)
+		-- each base's door faces the parade
+		map.BaseSlots[i] = CFrame.lookAt(pos, Vector3.new(col, 0, 0))
 	end
 
 	MapBuilder.Map = map

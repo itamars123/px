@@ -16,10 +16,12 @@ local Rarities = require(Shared.Rarities)
 local Remotes = require(Shared.Remotes)
 local Util = require(Shared.Util)
 local Motion = require(Shared.Motion)
+local Mutations = require(Shared.Mutations)
 
 local S
 
 local TreasureService = {}
+TreasureService.EventMutation = nil -- set by events (e.g. "Lava", "Rainbow")
 TreasureService.World = {} :: { [string]: any }
 
 local rng = Random.new()
@@ -80,7 +82,21 @@ function TreasureService.Give(player: Player, id: string, opts)
 		uid = Util.NewUid()
 	end
 	local plot = (not opts.NoAutoPlace) and S.BaseService.FreePlot(player) or nil
-	data.Treasures[uid] = { Id = id, Plot = plot }
+	data.Treasures[uid] = { Id = id, Plot = plot, Mut = opts.Mutation }
+	-- bought on the parade: the treasure walks itself home to its stand
+	local session = S.DataService.Session(player)
+	if plot and opts.WalkFrom and session then
+		local base = S.BaseService.Get(player)
+		local target = base and base.Plots[plot] and base.Plots[plot].Plot.Position or opts.WalkFrom
+		local walkTime = math.clamp((target - opts.WalkFrom).Magnitude / 14, 2, 14)
+		session.Arriving[uid] = { From = opts.WalkFrom, At = now() + walkTime }
+		task.delay(walkTime, function()
+			if session.Arriving[uid] then
+				session.Arriving[uid] = nil
+				S.StateService.MarkFull(player)
+			end
+		end)
+	end
 	data.Stats.Collected += 1
 
 	-- discovery bonus
@@ -99,9 +115,10 @@ function TreasureService.Give(player: Player, id: string, opts)
 			S.NetService.Notify(player, ("📖 NEW DISCOVERY: %s! +%s"):format(def.Name, Util.Money(bonus)), "discovery")
 		end
 	elseif not opts.Silent then
-		S.NetService.Notify(player, ("+ %s (%s)%s"):format(def.Name, def.Rarity, plot and "" or " → storage"), "success")
+		local mutText = opts.Mutation and (" " .. Mutations.Label(opts.Mutation)) or ""
+		S.NetService.Notify(player, ("+ %s (%s)%s%s"):format(def.Name, def.Rarity, mutText, plot and "" or " → storage"), "success")
 	end
-	local xp = opts.Source == "Market" and Config.XP.Buy or Config.XP.Collect
+	local xp = (opts.Source == "Market" or opts.Source == "Parade") and Config.XP.Buy or Config.XP.Collect
 	if opts.Source ~= "Steal" and opts.Source ~= "Trade" and opts.Source ~= "Rebirth" then
 		S.EconomyService.AddXP(player, xp)
 	end
@@ -191,7 +208,7 @@ local function sellOne(player: Player, data, session, uid: string): number?
 		return nil
 	end
 	local def = TreasureData.Get(entry.Id)
-	local value = def and math.floor(def.Value * Config.SellMultiplier) or 0
+	local value = def and math.floor(def.Value * Mutations.Multiplier(entry.Mut) * Config.SellMultiplier) or 0
 	data.Treasures[uid] = nil
 	return value
 end
@@ -266,6 +283,10 @@ end
 
 -- Current server-side position of a world treasure (accounts for wandering).
 function TreasureService.WorldPosition(record): Vector3
+	if record.Parade then
+		local p = record.Parade
+		return p.From + p.Dir * (p.Speed * (now() - p.Start))
+	end
 	if record.Seed then
 		return Motion.Position(record.Home, record.Seed, now(), Config.World.WanderRadius)
 	end
@@ -299,12 +320,19 @@ local tryPickup -- forward
 
 function TreasureService.SpawnWorld(def, cf: CFrame, kind: string, extra)
 	local uid = Util.NewUid()
-	local scale = kind == "Market" and 1.1 or 1
-	local model = TreasureModels.Build(def, { CFrame = cf, Scale = scale })
+	local scale = (kind == "Market" or kind == "Parade") and 1.15 or 1
+	local mutation = extra and extra.Mutation
+	local model = TreasureModels.Build(def, { CFrame = cf, Scale = scale, Mutation = mutation })
 	model:SetAttribute("WorldUid", uid)
 	model:SetAttribute("Kind", kind)
+	if extra and extra.Parade then
+		model:SetAttribute("ParadeStart", extra.Parade.Start)
+		model:SetAttribute("ParadeFrom", extra.Parade.From)
+		model:SetAttribute("ParadeDir", extra.Parade.Dir)
+		model:SetAttribute("ParadeSpeed", extra.Parade.Speed)
+	end
 	local root = model.PrimaryPart :: BasePart
-	local label = S.BaseService.MakeLabel(root, def, TreasureModels.Height(def, scale))
+	local label = S.BaseService.MakeLabel(root, def, TreasureModels.Height(def, scale), mutation)
 	label.MaxDistance = 90
 	local price = extra and extra.Price
 	if price then
@@ -351,6 +379,8 @@ function TreasureService.SpawnWorld(def, cf: CFrame, kind: string, extra)
 		Model = model,
 		Home = cf,
 		Seed = wander and seed or nil,
+		Mutation = mutation,
+		Parade = extra and extra.Parade,
 		Spawned = os.clock(),
 		Price = price,
 		Region = extra and extra.Region,
@@ -362,7 +392,7 @@ function TreasureService.SpawnWorld(def, cf: CFrame, kind: string, extra)
 	end)
 	model.Parent = worldFolder
 	if Rarities.Info[def.Rarity].Announce and kind ~= "Event" then
-		local where = kind == "Market" and "the Treasure Market" or (extra and extra.Region) or "the world"
+		local where = (kind == "Market" or kind == "Parade") and "the Treasure Parade" or (extra and extra.Region) or "the world"
 		Remotes.Announce:FireAllClients(("✨ A %s %s appeared in %s!"):format(def.Rarity, def.Name, tostring(where)), def.Rarity)
 	end
 	return record
@@ -395,7 +425,7 @@ tryPickup = function(player: Player, uid: string)
 		S.NetService.Notify(player, "Finish your trade first", "error")
 		return false
 	end
-	if not S.CarryService.CanCarry(player) then
+	if not record.Price and not S.CarryService.CanCarry(player) then
 		S.NetService.Notify(player, "Your hands are full! Bring your treasure home first.", "error")
 		return false
 	end
@@ -409,6 +439,14 @@ tryPickup = function(player: Player, uid: string)
 			return false
 		end
 		data.Money -= record.Price
+		-- Bought! It walks itself to your base (no carrying needed).
+		local from = TreasureService.WorldPosition(record)
+		TreasureService.RemoveWorld(uid, false)
+		S.TreasureService.Give(player, record.Id, { Source = "Parade", Mutation = record.Mutation, WalkFrom = from })
+		Remotes.Effect:FireClient(player, "Purchase")
+		S.NetService.Notify(player, "🛒 Purchased! It's walking to your base.", "success")
+		S.StateService.PushStats(player)
+		return true
 	end
 	TreasureService.RemoveWorld(uid, true)
 	-- Luck: chance to upgrade a free treasure by one rarity tier
@@ -425,11 +463,8 @@ tryPickup = function(player: Player, uid: string)
 			end
 		end
 	end
-	S.CarryService.Add(player, { Id = id, Source = record.Kind })
+	S.CarryService.Add(player, { Id = id, Source = record.Kind, Mut = record.Mutation })
 	Remotes.Effect:FireClient(player, "Pickup", TreasureData.Get(id).Rarity)
-	if record.Price then
-		S.NetService.Notify(player, "Purchased! Carry it back to your base.", "success")
-	end
 	S.StateService.PushStats(player)
 	return true
 end
@@ -451,7 +486,8 @@ local function spawnInField(field, pool)
 	local pos = field.Center + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
 	local ground = groundAt(pos)
 	local def = TreasureData.RollFromPool(pool or Config.SpawnPools.Field, rng)
-	return TreasureService.SpawnWorld(def, CFrame.new(ground) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0), "Field", { Region = field.Name })
+	local mutation = Mutations.Roll(rng, 1 + S.EconomyService.EventLuck, TreasureService.EventMutation)
+	return TreasureService.SpawnWorld(def, CFrame.new(ground) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0), "Field", { Region = field.Name, Mutation = mutation })
 end
 TreasureService.SpawnInField = spawnInField
 
@@ -522,6 +558,33 @@ function TreasureService.Start()
 
 	restockMarket()
 
+	-- Treasure Parade: a new treasure walks onto the carpet every few seconds
+	task.spawn(function()
+		local parade = S.MapBuilder.Map.Parade
+		local P = Config.Parade
+		local dir = (parade.End - parade.Start).Unit
+		local lifetime = (parade.End - parade.Start).Magnitude / P.Speed
+		while true do
+			local luck = 1 + S.EconomyService.EventLuck
+			local pool = Config.SpawnPools.Market
+			if S.EconomyService.EventLuck > 0 then
+				pool = Config.SpawnPools.Lucky
+			end
+			local def = TreasureData.RollFromPool(pool, rng)
+			local mutation = Mutations.Roll(rng, luck, TreasureService.EventMutation)
+			local price = math.floor(def.Value * Mutations.Multiplier(mutation) * Config.Market.PriceMultiplier)
+			local start = now()
+			TreasureService.SpawnWorld(def, CFrame.lookAt(parade.Start, parade.Start + dir), "Parade", {
+				Price = price,
+				Mutation = mutation,
+				Region = "Parade",
+				Lifetime = lifetime,
+				Parade = { Start = start, From = parade.Start, Dir = dir, Speed = P.Speed },
+			})
+			task.wait(P.Interval)
+		end
+	end)
+
 	-- spawn + cleanup loop
 	task.spawn(function()
 		local fieldTimer, secretTimer = 0, 0
@@ -551,6 +614,7 @@ function TreasureService.Start()
 			local t = os.clock()
 			for uid, w in pairs(TreasureService.World) do
 				if w.Kind ~= "Market" and t - w.Spawned > w.Lifetime then
+					-- parade treasures that reach the exit arch disappear
 					TreasureService.RemoveWorld(uid, true)
 				end
 			end
@@ -561,7 +625,7 @@ function TreasureService.Start()
 				remaining = Config.Market.RestockSeconds
 			end
 			if marketSign then
-				marketSign.Text = ("🛒 New stock in %ds"):format(math.ceil(remaining))
+				marketSign.Text = "🛒 Buy treasures on the Treasure Parade →"
 			end
 		end
 	end)
@@ -597,7 +661,7 @@ function TreasureService.Start()
 					if data.Abilities.Magnet then
 						local radius = 18
 						for uid, w in pairs(TreasureService.World) do
-							if w.Kind ~= "Market" and w.Model then
+							if w.Kind ~= "Market" and w.Kind ~= "Parade" and w.Model then
 								if (TreasureService.WorldPosition(w) - hrp.Position).Magnitude <= radius then
 									if not S.CarryService.CanCarry(player) then
 										break

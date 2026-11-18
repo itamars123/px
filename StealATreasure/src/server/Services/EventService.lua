@@ -118,6 +118,25 @@ local function treasureRain()
 	setState(nil, 0)
 end
 
+-- Mutation events: everything that spawns has a big chance to mutate
+local function mutationEvent(name: string, title: string, text: string, rarity: string)
+	local d = 90
+	setState(title, d)
+	Remotes.Announce:FireAllClients(text, rarity)
+	S.TreasureService.EventMutation = name
+	task.wait(d)
+	S.TreasureService.EventMutation = nil
+	setState(nil, 0)
+end
+
+local function lavaEvent()
+	mutationEvent("Lava", "Lava Eruption", "🌋 LAVA ERUPTION! Treasures are spawning with the LAVA mutation (x2.5)!", "Mythical")
+end
+
+local function rainbowEvent()
+	mutationEvent("Rainbow", "Rainbow Storm", "🌈 RAINBOW STORM! Rainbow mutations (x2) everywhere!", "Divine")
+end
+
 local function apocalypse()
 	local d = Config.Events.ApocalypseDuration
 	setState("Treasure Apocalypse", d)
@@ -197,6 +216,8 @@ local EVENTS = {
 	{ Fn = secretSpawn, Weight = 10 },
 	{ Fn = apocalypse, Weight = 6 },
 	{ Fn = divineDescent, Weight = 6 },
+	{ Fn = lavaEvent, Weight = 10 },
+	{ Fn = rainbowEvent, Weight = 10 },
 }
 
 function EventService.RunRandom()
@@ -230,6 +251,8 @@ function EventService.Start()
 			Secret = secretSpawn,
 			Apocalypse = apocalypse,
 			Divine = divineDescent,
+			Lava = lavaEvent,
+			Rainbow = rainbowEvent,
 		}
 		S.NetService.Handle("DebugEvent", function(_, name)
 			local fn = byName[name]
@@ -251,6 +274,7 @@ function EventService.Start()
 				setState(nil, 0)
 				S.EconomyService.EventMultiplier = 1
 				S.EconomyService.EventLuck = 0
+				S.TreasureService.EventMutation = nil
 			end
 		end
 	end)

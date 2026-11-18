@@ -48,6 +48,9 @@ function StealService.CanSteal(thief: Player, owner: Player, uid: string)
 	if oSes.Stealing[uid] then
 		return false, "Someone is already stealing that!"
 	end
+	if oSes.Arriving[uid] then
+		return false, "It's still walking home — wait for it to reach its stand!"
+	end
 	if oSes.LockEnd > t then
 		return false, "This base is locked! 🔒"
 	end
@@ -103,6 +106,7 @@ function StealService.TryStart(thief: Player, owner: Player, uid: string)
 	S.BaseService.Refresh(owner)
 	S.CarryService.Add(thief, {
 		Id = entry.Id,
+		Mut = entry.Mut,
 		Source = "Steal",
 		Victim = owner,
 		VictimUid = uid,
@@ -165,7 +169,7 @@ function StealService.Complete(thief: Player, item)
 		tData.Stats.Steals += 1
 	end
 
-	S.TreasureService.Give(thief, item.Id, { Source = "Steal" })
+	S.TreasureService.Give(thief, item.Id, { Source = "Steal", Mutation = item.Mut })
 	S.EconomyService.AddXP(thief, Config.XP.Steal)
 	S.PlayerService.Emote(thief, "Victory", 4)
 
@@ -201,6 +205,7 @@ end
 local function makeHammer(): Tool
 	local tool = Instance.new("Tool")
 	tool.Name = "Bonk Hammer"
+	tool:SetAttribute("Bat", true)
 	tool.ToolTip = "Bonk thieves to recover stolen treasure!"
 	tool.CanBeDropped = false
 	tool.RequiresHandle = true
@@ -277,6 +282,9 @@ local function onSwing(player: Player, tool: Tool)
 			tool.Grip = CFrame.new(0, -1.2, 0)
 		end
 	end)
+	-- bat tier stats
+	local pdata = S.DataService.Get(player)
+	local bat = UpgradeData.BatStats(pdata and pdata.Gear and pdata.Gear.Bat or 0)
 	-- find a target in front of us
 	for _, other in ipairs(Players:GetPlayers()) do
 		if other ~= player then
@@ -284,7 +292,7 @@ local function onSwing(player: Player, tool: Tool)
 			if ohrp then
 				local offset = ohrp.Position - hrp.Position
 				local dist = offset.Magnitude
-				if dist <= Config.Steal.BonkRange and (dist < 3 or hrp.CFrame.LookVector:Dot(offset.Unit) > 0.2) then
+				if dist <= bat.Range and (dist < 3 or hrp.CFrame.LookVector:Dot(offset.Unit) > 0.2) then
 					local hitSound = handle and handle:FindFirstChild("Hit")
 					if hitSound then
 						hitSound:Play()
@@ -293,7 +301,7 @@ local function onSwing(player: Player, tool: Tool)
 					if S.CarryService.IsCarryingStolen(other) then
 						recovered = S.CarryService.DropStolen(other)
 					end
-					Remotes.Effect:FireClient(other, "Knockback", (offset.Unit + Vector3.new(0, 0.6, 0)) * 60, Config.Steal.BonkStun)
+					Remotes.Effect:FireClient(other, "Knockback", (offset.Unit + Vector3.new(0, 0.6, 0)) * bat.Knock, bat.Stun)
 					Remotes.Effect:FireClient(player, "BonkHit", ohrp.Position)
 					if recovered > 0 then
 						local data = S.DataService.Get(player)
@@ -313,14 +321,46 @@ end
 
 function StealService.GiveHammer(player: Player)
 	local backpack = player:FindFirstChildOfClass("Backpack") or player:WaitForChild("Backpack", 5)
-	if not backpack or backpack:FindFirstChild("Bonk Hammer") then
+	if not backpack then
+		return
+	end
+	for _, t in ipairs(backpack:GetChildren()) do
+		if t:GetAttribute("Bat") then
+			return
+		end
+	end
+	if player.Character and player.Character:FindFirstChildWhichIsA("Tool") and player.Character:FindFirstChildWhichIsA("Tool"):GetAttribute("Bat") then
 		return
 	end
 	local tool = hammerTemplate:Clone()
+	local data = S.DataService.Get(player)
+	local stats = UpgradeData.BatStats(data and data.Gear and data.Gear.Bat or 0)
+	tool.Name = stats.Name
+	local head = tool:FindFirstChild("Head")
+	if head then
+		head.Color = stats.Color
+		if (data and data.Gear and data.Gear.Bat or 0) >= 2 then
+			head.Material = Enum.Material.Neon
+		end
+	end
 	tool.Activated:Connect(function()
 		onSwing(player, tool)
 	end)
 	tool.Parent = backpack
+end
+
+-- Replace the bat after a tier upgrade
+function StealService.RefreshHammer(player: Player)
+	for _, holder in ipairs({ player:FindFirstChildOfClass("Backpack"), player.Character }) do
+		if holder then
+			for _, t in ipairs(holder:GetChildren()) do
+				if t:IsA("Tool") and t:GetAttribute("Bat") then
+					t:Destroy()
+				end
+			end
+		end
+	end
+	StealService.GiveHammer(player)
 end
 
 function StealService.Init(services)

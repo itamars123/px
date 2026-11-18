@@ -1,5 +1,5 @@
 <roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
-<Item class="ReplicatedStorage" referent="RBX0000000D"><Properties><string name="Name">ReplicatedStorage</string></Properties><Item class="Folder" referent="RBX0000000C"><Properties><string name="Name">Shared</string></Properties><Item class="ModuleScript" referent="RBX00000001"><Properties><string name="Name">AchievementData</string><ProtectedString name="Source"><![CDATA[-- AchievementData.lua
+<Item class="ReplicatedStorage" referent="RBX0000000E"><Properties><string name="Name">ReplicatedStorage</string></Properties><Item class="Folder" referent="RBX0000000D"><Properties><string name="Name">Shared</string></Properties><Item class="ModuleScript" referent="RBX00000001"><Properties><string name="Name">AchievementData</string><ProtectedString name="Source"><![CDATA[-- AchievementData.lua
 -- Achievements: a stat, a goal and a gem reward. Checked on the server.
 
 local AchievementData = {}
@@ -123,8 +123,22 @@ Config.Spawns = {
 	PickupDistance = 12,
 }
 
+-- Layout: bases line both sides of the Treasure Parade; the plaza sits at
+-- the parade's start.
+Config.PlazaCenter = Vector3.new(-340, 0, 0)
+Config.BaseRowZ = 80 -- base centres at z = +/-80, facing the parade
+Config.BaseColumnsX = { -168, -56, 56, 168 }
+Config.Parade = {
+	StartX = -248,
+	EndX = 248,
+	Z = 0,
+	Width = 14,
+	Speed = 7, -- studs per second
+	Interval = 2.6, -- seconds between treasures
+}
+
 Config.Market = {
-	Stalls = 10,
+	Stalls = 0, -- the walking Treasure Parade replaced the old stalls
 	RestockSeconds = 45,
 	PriceMultiplier = 1.0,
 }
@@ -215,6 +229,23 @@ Config.Rebirth = {
 	MaxSpeedBonus = 10,
 	StartingMoneyPerRebirth = 1000,
 }
+-- Each rebirth also requires owning certain treasures (kept until you rebirth).
+local REQ = {
+	{ Rarity = "Epic", Count = 1 },
+	{ Rarity = "Legendary", Count = 1 },
+	{ Rarity = "Legendary", Count = 2 },
+	{ Rarity = "Mythical", Count = 1 },
+	{ Rarity = "Mythical", Count = 2 },
+	{ Rarity = "Secret", Count = 1 },
+	{ Rarity = "Secret", Count = 2 },
+	{ Rarity = "Divine", Count = 1 },
+	{ Rarity = "Divine", Count = 2 },
+	{ Rarity = "Celestial", Count = 1 },
+}
+function Config.RebirthRequirement(rebirths: number)
+	return REQ[math.min(rebirths + 1, #REQ)]
+end
+
 function Config.RebirthCost(rebirths: number): number
 	return math.floor(Config.Rebirth.BaseCost * Config.Rebirth.CostGrowth ^ rebirths)
 end
@@ -360,7 +391,57 @@ end
 
 return Motion
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000004"><Properties><string name="Name">PetData</string><ProtectedString name="Source"><![CDATA[-- PetData.lua
+<Item class="ModuleScript" referent="RBX00000004"><Properties><string name="Name">Mutations</string><ProtectedString name="Source"><![CDATA[-- Mutations.lua
+-- Treasure mutations: rare variants that multiply income and value and
+-- change how the treasure looks. Rolled when a treasure spawns on the parade
+-- or in the world; kept through stealing, trading and saving.
+
+local Mutations = {}
+
+Mutations.Order = { "Gold", "Diamond", "Rainbow", "Lava", "Galaxy" }
+
+Mutations.Info = {
+	Gold = { Multiplier = 1.25, Chance = 0.08, Color = Color3.fromRGB(255, 200, 50), Material = "Foil", Icon = "🟡" },
+	Diamond = { Multiplier = 1.5, Chance = 0.03, Color = Color3.fromRGB(150, 230, 255), Material = "Glass", Icon = "💠" },
+	Rainbow = { Multiplier = 2, Chance = 0.01, Color = Color3.fromRGB(255, 120, 220), Material = "Neon", Icon = "🌈", Rainbow = true },
+	Lava = { Multiplier = 2.5, Chance = 0.004, Color = Color3.fromRGB(255, 90, 20), Material = "CrackedLava", Icon = "🌋", EventOnly = "Lava" },
+	Galaxy = { Multiplier = 4, Chance = 0.002, Color = Color3.fromRGB(110, 70, 255), Material = "Neon", Icon = "🌌" },
+}
+
+function Mutations.Multiplier(name: string?): number
+	local info = name and Mutations.Info[name]
+	return info and info.Multiplier or 1
+end
+
+-- Rolls a mutation (or nil). luck multiplies every chance; boost (event) adds.
+function Mutations.Roll(rng: Random, luck: number?, eventMutation: string?)
+	local l = luck or 1
+	-- rarest first so a lucky roll lands on the best mutation
+	for i = #Mutations.Order, 1, -1 do
+		local name = Mutations.Order[i]
+		local info = Mutations.Info[name]
+		local chance = info.Chance * l
+		if info.EventOnly and info.EventOnly ~= eventMutation then
+			chance = 0
+		end
+		if eventMutation == name then
+			chance = math.max(chance, 0.25)
+		end
+		if chance > 0 and rng:NextNumber() < chance then
+			return name
+		end
+	end
+	return nil
+end
+
+function Mutations.Label(name: string?): string
+	local info = name and Mutations.Info[name]
+	return info and (info.Icon .. " " .. name:upper()) or ""
+end
+
+return Mutations
+]]></ProtectedString></Properties></Item>
+<Item class="ModuleScript" referent="RBX00000005"><Properties><string name="Name">PetData</string><ProtectedString name="Source"><![CDATA[-- PetData.lua
 -- 52 pets across 9 rarities, plus the eggs that hatch them.
 -- Row: Name | Species | BodyHex | AccentHex | Material | BonusType
 -- BonusType: Money (income %), Luck (luck %), Speed (+walk speed), Gems (gem %).
@@ -596,7 +677,7 @@ end
 
 return PetData
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000005"><Properties><string name="Name">PetModels</string><ProtectedString name="Source"><![CDATA[-- PetModels.lua
+<Item class="ModuleScript" referent="RBX00000006"><Properties><string name="Name">PetModels</string><ProtectedString name="Source"><![CDATA[-- PetModels.lua
 -- Procedural pet builder. Every part is anchored and tagged with a Role so
 -- the client follower can animate legs, wings, tails and ears each frame by
 -- moving parts relative to the pet's root (BulkMoveTo, no physics).
@@ -802,7 +883,7 @@ end
 
 return PetModels
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000006"><Properties><string name="Name">Rarities</string><ProtectedString name="Source"><![CDATA[-- Rarities.lua
+<Item class="ModuleScript" referent="RBX00000007"><Properties><string name="Name">Rarities</string><ProtectedString name="Source"><![CDATA[-- Rarities.lua
 -- Rarity tiers, their colours and which visual effects they get.
 
 local Rarities = {}
@@ -962,7 +1043,7 @@ end
 
 return Rarities
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000007"><Properties><string name="Name">Remotes</string><ProtectedString name="Source"><![CDATA[-- Remotes.lua
+<Item class="ModuleScript" referent="RBX00000008"><Properties><string name="Name">Remotes</string><ProtectedString name="Source"><![CDATA[-- Remotes.lua
 -- Declares every RemoteEvent / RemoteFunction. The server creates them, the
 -- client waits for them. All client->server traffic goes through `Action`
 -- (validated & rate limited on the server).
@@ -1024,7 +1105,7 @@ end
 
 return Remotes
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000008"><Properties><string name="Name">TreasureData</string><ProtectedString name="Source"><![CDATA[-- TreasureData.lua
+<Item class="ModuleScript" referent="RBX00000009"><Properties><string name="Name">TreasureData</string><ProtectedString name="Source"><![CDATA[-- TreasureData.lua
 -- 102 collectable treasures + 4 rebirth-exclusive treasures.
 -- Each row: Name | Shape | PrimaryHex | SecondaryHex | Material | Fx(optional)
 -- Value and money-per-second are derived from rarity and position in the tier so
@@ -1348,7 +1429,7 @@ end
 
 return TreasureData
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000009"><Properties><string name="Name">TreasureModels</string><ProtectedString name="Source"><![CDATA[-- TreasureModels.lua
+<Item class="ModuleScript" referent="RBX0000000A"><Properties><string name="Name">TreasureModels</string><ProtectedString name="Source"><![CDATA[-- TreasureModels.lua
 -- Procedurally builds a unique 3D model for every treasure from its shape,
 -- colours, material and effect. Shared so the server (world objects) and the
 -- client (viewport previews) build identical models without any asset uploads.
@@ -1358,6 +1439,7 @@ return TreasureData
 -- animates Root locally (spin / bob) using the "Home" CFrame attribute.
 
 local Rarities = require(script.Parent.Rarities)
+local Mutations = require(script.Parent.Mutations)
 
 local TreasureModels = {}
 
@@ -1968,6 +2050,40 @@ function TreasureModels.Build(def, opts)
 	local builder = newBuilder(model, root, scale, def)
 	local fn = Shapes[def.Shape] or Shapes.Gem
 	fn(builder)
+	-- Mutation: recolour the body and add a matching aura
+	local mut = opts.Mutation and Mutations.Info[opts.Mutation]
+	if mut then
+		local i = 0
+		for _, p in ipairs(model:GetChildren()) do
+			if p:IsA("BasePart") and p ~= root then
+				i += 1
+				if mut.Rainbow then
+					p.Color = Color3.fromHSV((i * 0.13) % 1, 0.7, 1)
+				elseif p.Material ~= Enum.Material.Neon then
+					p.Color = p.Color:Lerp(mut.Color, 0.75)
+					p.Material = mat(mut.Material)
+					if p.Material == Enum.Material.Glass then
+						p.Transparency = 0.2
+					end
+				end
+			end
+		end
+		local att = Instance.new("Attachment")
+		att.Name = "MutationFx"
+		att.Position = Vector3.new(0, 1.6 * scale, 0)
+		att.Parent = root
+		local e = Instance.new("ParticleEmitter")
+		e.Texture = TEX_SPARKLE
+		e.Color = ColorSequence.new(mut.Color, Color3.new(1, 1, 1))
+		e.LightEmission = 1
+		e.Rate = 12
+		e.Lifetime = NumberRange.new(0.8, 1.4)
+		e.Speed = NumberRange.new(1, 2.5)
+		e.SpreadAngle = Vector2.new(180, 180)
+		e.Size = NumberSequence.new(0.45 * scale, 0)
+		e.Parent = att
+		model:SetAttribute("Mutation", opts.Mutation)
+	end
 	if opts.Face ~= false then
 		addFace(builder)
 	end
@@ -1996,7 +2112,7 @@ end
 
 return TreasureModels
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX0000000A"><Properties><string name="Name">UpgradeData</string><ProtectedString name="Source"><![CDATA[-- UpgradeData.lua
+<Item class="ModuleScript" referent="RBX0000000B"><Properties><string name="Name">UpgradeData</string><ProtectedString name="Source"><![CDATA[-- UpgradeData.lua
 -- Shop catalogue: levelled upgrades and one-time special abilities.
 
 local Config = require(script.Parent.Config)
@@ -2140,6 +2256,32 @@ UpgradeData.Abilities = {
 	},
 }
 
+-- Gear: tools bought with money (kept through rebirth).
+UpgradeData.Gear = {
+	Bat = {
+		Order = 1,
+		Name = "Bonk Bat",
+		Icon = "🏏",
+		Levels = { "Wooden Bonk Hammer", "Iron Bat", "Diamond Bat", "Galaxy Bat" },
+		Costs = { 25000, 400000, 6000000 },
+		Description = "Bigger bonks: longer reach, longer stun, bigger knockback.",
+	},
+	SpeedCoil = { Order = 2, Name = "Speed Coil", Icon = "🌀", Cost = 15000, Description = "Hold it to run +6 faster." },
+	Grapple = { Order = 3, Name = "Grapple Hook", Icon = "🪝", Cost = 90000, Description = "Click to zip to a spot up to 90 studs away (4s cooldown)." },
+	Trap = { Order = 4, Name = "Bear Trap", Icon = "🪤", Cost = 60000, Description = "Place up to 3 traps in your base. Thieves get stuck and drop their loot." },
+}
+
+function UpgradeData.BatStats(level: number)
+	level = level or 0
+	return {
+		Name = UpgradeData.Gear.Bat.Levels[level + 1],
+		Range = 9 + level * 2,
+		Stun = 1.2 + level * 0.4,
+		Knock = 60 + level * 20,
+		Color = ({ Color3.fromRGB(255, 80, 90), Color3.fromRGB(170, 175, 185), Color3.fromRGB(120, 230, 255), Color3.fromRGB(150, 80, 255) })[level + 1],
+	}
+end
+
 -- Gem shop: boosts and permanent perks bought with gems.
 UpgradeData.GemShop = {
 	MoneyBoost = { Order = 1, Name = "2x Money (15 min)", Icon = "💸", Cost = 100, Boost = "Money", Duration = 900, Description = "Double all income for 15 minutes." },
@@ -2253,7 +2395,7 @@ end
 
 return UpgradeData
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX0000000B"><Properties><string name="Name">Util</string><ProtectedString name="Source"><![CDATA[-- Util.lua
+<Item class="ModuleScript" referent="RBX0000000C"><Properties><string name="Name">Util</string><ProtectedString name="Source"><![CDATA[-- Util.lua
 -- Small helpers shared by client and server.
 
 local Util = {}
@@ -2335,7 +2477,7 @@ return Util
 ]]></ProtectedString></Properties></Item>
 </Item>
 </Item>
-<Item class="ServerScriptService" referent="RBX00000024"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Folder" referent="RBX00000023"><Properties><string name="Name">Server</string></Properties><Item class="Script" referent="RBX0000000E"><Properties><string name="Name">Main</string><ProtectedString name="Source"><![CDATA[-- Main.server.lua
+<Item class="ServerScriptService" referent="RBX00000026"><Properties><string name="Name">ServerScriptService</string></Properties><Item class="Folder" referent="RBX00000025"><Properties><string name="Name">Server</string></Properties><Item class="Script" referent="RBX0000000F"><Properties><string name="Name">Main</string><ProtectedString name="Source"><![CDATA[-- Main.server.lua
 -- Boots every server service in dependency order: Init() wires references,
 -- Start() begins loops and connections.
 
@@ -2352,6 +2494,7 @@ local ORDER = {
 	"TreasureService",
 	"StealService",
 	"PlayerService",
+	"GearService",
 	"PetService",
 	"AchievementService",
 	"WorldService",
@@ -2386,7 +2529,7 @@ end
 
 print(("[STEAL A TREASURE] Server ready — %d services online"):format(#ORDER))
 ]]></ProtectedString></Properties></Item>
-<Item class="Folder" referent="RBX00000022"><Properties><string name="Name">Services</string></Properties><Item class="ModuleScript" referent="RBX0000000F"><Properties><string name="Name">AchievementService</string><ProtectedString name="Source"><![CDATA[-- AchievementService.lua
+<Item class="Folder" referent="RBX00000024"><Properties><string name="Name">Services</string></Properties><Item class="ModuleScript" referent="RBX00000010"><Properties><string name="Name">AchievementService</string><ProtectedString name="Source"><![CDATA[-- AchievementService.lua
 -- Checks achievement progress on the server and awards gems.
 
 local Players = game:GetService("Players")
@@ -2473,7 +2616,7 @@ end
 
 return AchievementService
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000010"><Properties><string name="Name">BaseService</string><ProtectedString name="Source"><![CDATA[-- BaseService.lua
+<Item class="ModuleScript" referent="RBX00000011"><Properties><string name="Name">BaseService</string><ProtectedString name="Source"><![CDATA[-- BaseService.lua
 -- Personal bases: building the 8 base shells, assigning them to players,
 -- rendering placed treasures on display platforms, the door barrier lock,
 -- alarm lights and the owner sign.
@@ -2488,6 +2631,7 @@ local UpgradeData = require(Shared.UpgradeData)
 local Rarities = require(Shared.Rarities)
 local Util = require(Shared.Util)
 local Remotes = require(Shared.Remotes)
+local Mutations = require(Shared.Mutations)
 local CollectionService = game:GetService("CollectionService")
 
 local S -- services table
@@ -2749,7 +2893,12 @@ local function buildShell(index: number, cf: CFrame, parent: Instance)
 		lockBB.Name = "LockedLabel"
 		lockBB.MaxDistance = 80
 		lockLabel.Text = "🔒"
-		plotParts[i] = { Plot = plot, Rim = rim, LockBB = lockBB }
+		-- collect plate: step on it to grab the cash this stand has earned
+		local plate = part(plots, Vector3.new(5, 0.35, 1.7), L(lp.X, 1.2 + lp.Y, lp.Z - 3.95), Color3.fromRGB(70, 230, 110), Enum.Material.Neon, { Name = "Plate" .. i, CanCollide = false, CanTouch = true })
+		plate:SetAttribute("Plot", i)
+		local plateBB, plateLabel = S.MapBuilder.Billboard(plate, "", Color3.fromRGB(140, 255, 150), UDim2.fromOffset(110, 30), 1.4)
+		plateBB.MaxDistance = 60
+		plotParts[i] = { Plot = plot, Rim = rim, LockBB = lockBB, Plate = plate, PlateLabel = plateLabel }
 	end
 
 	local treasures = Instance.new("Folder")
@@ -2854,16 +3003,56 @@ function BaseService.SetColor(player: Player, index)
 end
 
 -- Collector pad --------------------------------------------------------------
+-- Collects everything: the vault (offline income) and every stand's plate.
 function BaseService.Collect(player: Player)
 	local data = S.DataService.Get(player)
-	if not data or (data.Vault or 0) < 1 then
+	if not data then
 		return
 	end
-	local amount = math.floor(data.Vault)
-	data.Vault -= amount
+	local amount = math.floor(data.Vault or 0)
+	data.Vault = (data.Vault or 0) - amount
+	for key, v in pairs(data.PlotCash) do
+		local whole = math.floor(v)
+		amount += whole
+		data.PlotCash[key] = v - whole
+	end
+	if amount < 1 then
+		return
+	end
 	S.EconomyService.AddMoney(player, amount)
 	Remotes.Effect:FireClient(player, "Collect", amount)
 	S.StateService.MarkFull(player)
+	BaseService.UpdatePlates(player)
+end
+
+-- Collects one stand's plate (stepping on it).
+function BaseService.CollectPlot(player: Player, plot: number)
+	local data = S.DataService.Get(player)
+	if not data then
+		return
+	end
+	local key = tostring(plot)
+	local amount = math.floor(data.PlotCash[key] or 0)
+	if amount < 1 then
+		return
+	end
+	data.PlotCash[key] -= amount
+	S.EconomyService.AddMoney(player, amount)
+	Remotes.Effect:FireClient(player, "Collect", amount)
+	BaseService.UpdatePlates(player)
+end
+
+function BaseService.UpdatePlates(player: Player)
+	local base = BaseService.Get(player)
+	local data = S.DataService.Get(player)
+	if not base or not data then
+		return
+	end
+	for i, p in ipairs(base.Plots) do
+		local cash = math.floor(data.PlotCash[tostring(i)] or 0)
+		p.PlateLabel.Text = cash >= 1 and Util.Money(cash) or ""
+		p.Plate.Transparency = (data.AutoCollect or not BaseService.IsPlotUnlocked(data, i)) and 1 or 0
+	end
 end
 
 -- Queries --------------------------------------------------------------------------
@@ -2963,7 +3152,7 @@ function BaseService.CountStored(data): number
 end
 
 -- Rendering -------------------------------------------------------------------------
-local function makeLabel(root: BasePart, def, height: number)
+local function makeLabel(root: BasePart, def, height: number, mutation: string?)
 	local bb = Instance.new("BillboardGui")
 	bb.Name = "Label"
 	bb.Size = UDim2.fromOffset(180, 54)
@@ -2988,7 +3177,7 @@ local function makeLabel(root: BasePart, def, height: number)
 	rarity.Font = Enum.Font.GothamBlack
 	rarity.TextScaled = true
 	rarity.TextColor3 = Rarities.Color(def.Rarity)
-	rarity.Text = def.Rarity:upper()
+	rarity.Text = def.Rarity:upper() .. (mutation and ("  " .. Mutations.Label(mutation)) or "")
 	local st2 = Instance.new("UIStroke")
 	st2.Thickness = 2
 	st2.Parent = rarity
@@ -3000,7 +3189,7 @@ local function makeLabel(root: BasePart, def, height: number)
 	mps.Font = Enum.Font.GothamBold
 	mps.TextScaled = true
 	mps.TextColor3 = Color3.fromRGB(120, 255, 120)
-	mps.Text = Util.Money(def.MPS) .. "/s"
+	mps.Text = Util.Money(def.MPS * Mutations.Multiplier(mutation)) .. "/s"
 	local st3 = Instance.new("UIStroke")
 	st3.Thickness = 2
 	st3.Parent = mps
@@ -3062,11 +3251,17 @@ function BaseService.Refresh(player: Player)
 			if def then
 				-- rotate so the treasure's face looks toward the door
 				local cf = p.Plot.CFrame * CFrame.new(0, p.Plot.Size.Y / 2, 0) * CFrame.Angles(0, math.pi, 0)
-				local model = TreasureModels.Build(def, { CFrame = cf, Scale = 1 })
+				local model = TreasureModels.Build(def, { CFrame = cf, Scale = 1, Mutation = entry.Mut })
 				model:SetAttribute("Uid", want)
 				model:SetAttribute("OwnerId", player.UserId)
+				-- just bought on the parade: clients animate it walking home
+				local arriving = session.Arriving[want]
+				if arriving then
+					model:SetAttribute("WalkFrom", arriving.From)
+					model:SetAttribute("ArriveAt", arriving.At)
+				end
 				local root = model.PrimaryPart :: BasePart
-				makeLabel(root, def, TreasureModels.Height(def))
+				makeLabel(root, def, TreasureModels.Height(def), entry.Mut)
 				local hold = UpgradeData.StealHold(data)
 				local steal = promptOn(root, "StealPrompt", "Steal", def.Name, hold, "Steal")
 				local store = promptOn(root, "StorePrompt", "Pick Up", def.Name, 0.3, "Store")
@@ -3117,6 +3312,7 @@ function BaseService.UpdateSign(player: Player)
 	base.Sub.Text = ("💰 %s/s%s"):format(Util.Abbreviate(session.MPS or 0), lockText)
 	local data = S.DataService.Get(player)
 	if data then
+		BaseService.UpdatePlates(player)
 		base.PadLabel.Text = data.AutoCollect and ("🤖 AUTO • %s/s"):format(Util.Abbreviate(session.MPS or 0)) or ("💰 " .. Util.Money(math.floor(data.Vault or 0)) .. "\nstep to collect")
 	end
 end
@@ -3312,6 +3508,14 @@ function BaseService.Start()
 				BaseService.Collect(who)
 			end
 		end)
+		for j, p in ipairs(base.Plots) do
+			p.Plate.Touched:Connect(function(hit)
+				local who = Players:GetPlayerFromCharacter(hit.Parent)
+				if who and who == base.Owner then
+					BaseService.CollectPlot(who, j)
+				end
+			end)
+		end
 		-- hide the second floor until bought
 		for _, d in ipairs(base.SecondFloor:GetChildren()) do
 			d.Transparency = 1
@@ -3392,7 +3596,7 @@ end
 
 return BaseService
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000011"><Properties><string name="Name">CarryService</string><ProtectedString name="Source"><![CDATA[-- CarryService.lua
+<Item class="ModuleScript" referent="RBX00000012"><Properties><string name="Name">CarryService</string><ProtectedString name="Source"><![CDATA[-- CarryService.lua
 -- Carrying treasures above your head: attaching models, the carry pose (arms
 -- raised), movement penalty, delivering to your own base and dropping/returning
 -- on death, leave or getting bonked.
@@ -3480,7 +3684,7 @@ function CarryService.Add(player: Player, item)
 	if not def or not hrp then
 		return false
 	end
-	local model = TreasureModels.Build(def, { Scale = CARRY_SCALE, CFrame = hrp.CFrame, Anchored = false })
+	local model = TreasureModels.Build(def, { Scale = CARRY_SCALE, CFrame = hrp.CFrame, Anchored = false, Mutation = item.Mut })
 	model.Name = "Carried_" .. def.Id
 	model:SetAttribute("Carried", true)
 	model.Parent = char
@@ -3531,7 +3735,7 @@ function CarryService.DropAll(player: Player, position: Vector3?)
 		if item.Source == "Steal" then
 			S.StealService.Return(item, "dropped")
 		elseif item.Source == "Market" then
-			S.TreasureService.Give(player, item.Id, { Silent = true, NoAutoPlace = true })
+			S.TreasureService.Give(player, item.Id, { Silent = true, NoAutoPlace = true, Mutation = item.Mut })
 		else
 			if position then
 				S.TreasureService.DropToWorld(item.Id, position, item.Source)
@@ -3547,7 +3751,7 @@ local function deposit(player: Player)
 		if item.Source == "Steal" then
 			S.StealService.Complete(player, item)
 		else
-			S.TreasureService.Give(player, item.Id, { Source = item.Source })
+			S.TreasureService.Give(player, item.Id, { Source = item.Source, Mutation = item.Mut })
 		end
 	end
 end
@@ -3598,7 +3802,7 @@ end
 
 return CarryService
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000012"><Properties><string name="Name">DataService</string><ProtectedString name="Source"><![CDATA[-- DataService.lua
+<Item class="ModuleScript" referent="RBX00000013"><Properties><string name="Name">DataService</string><ProtectedString name="Source"><![CDATA[-- DataService.lua
 -- Loads, holds and saves player progress with DataStoreService.
 --  * UpdateAsync with a session lock so two servers never write the same save
 --  * retries with backoff, autosave, save on leave and on shutdown
@@ -3623,10 +3827,12 @@ local TEMPLATE = {
 	XP = 0,
 	Level = 1,
 	Gems = Config.Gems.Start,
-	Vault = 0, -- uncollected income waiting on your collector pad
+	Vault = 0, -- offline income waiting on your vault pad
+	PlotCash = {}, -- [tostring(plot)] = cash waiting on that stand's collect plate
 	Upgrades = { Speed = 0, Carry = 0, Base = 0, Protection = 0, Income = 0, Luck = 0, Security = 0, Walls = 0, Floors = 0 },
 	Pets = {}, -- [uid] = { Id = string, Equipped = boolean }
 	ExtraPetSlots = 0,
+	Gear = { Bat = 0, SpeedCoil = false, Grapple = false, Trap = false },
 	AutoCollect = false,
 	Boosts = {}, -- [name] = os.time() expiry
 	Achievements = {}, -- [id] = true
@@ -3689,6 +3895,7 @@ local function newSession(player: Player)
 		Stamina = Config.Sprint.MaxStamina,
 		Sprinting = false,
 		CameraAlerts = {}, -- [intruder] = last alert clock
+		Arriving = {}, -- [uid] = { From = Vector3, At = serverTime } treasures walking home
 		PetBonus = { Money = 0, Luck = 0, Speed = 0, Gems = 0 },
 		Aura = 0,
 	}
@@ -3874,7 +4081,7 @@ end
 
 return DataService
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000013"><Properties><string name="Name">EconomyService</string><ProtectedString name="Source"><![CDATA[-- EconomyService.lua
+<Item class="ModuleScript" referent="RBX00000014"><Properties><string name="Name">EconomyService</string><ProtectedString name="Source"><![CDATA[-- EconomyService.lua
 -- Passive income, money/XP helpers, levels, offline earnings and the global
 -- income multiplier used by events (Golden Hour).
 
@@ -3886,6 +4093,7 @@ local TreasureData = require(Shared.TreasureData)
 local UpgradeData = require(Shared.UpgradeData)
 local Remotes = require(Shared.Remotes)
 local Util = require(Shared.Util)
+local Mutations = require(Shared.Mutations)
 
 local S
 
@@ -3960,17 +4168,23 @@ function EconomyService.ComputeMPS(player: Player): number
 		return 0
 	end
 	local total, aura = 0, 0
+	local perPlot = {}
 	for uid, t in pairs(data.Treasures) do
-		if t.Plot and not session.Stealing[uid] then
+		if t.Plot and not session.Stealing[uid] and not session.Arriving[uid] then
 			local def = TreasureData.Get(t.Id)
 			if def then
-				total += def.MPS
+				local v = def.MPS * Mutations.Multiplier(t.Mut)
+				total += v
+				perPlot[t.Plot] = v
 				aura += def.Aura or 0
 			end
 		end
 	end
 	session.Aura = aura
-	return total * UpgradeData.IncomeMultiplier(data, aura, session.PetBonus.Money) * EconomyService.EventMultiplier
+	local mult = UpgradeData.IncomeMultiplier(data, aura, session.PetBonus.Money) * EconomyService.EventMultiplier
+	session.PlotIncome = perPlot
+	session.IncomeMult = mult
+	return total * mult
 end
 
 function EconomyService.GrantOffline(player: Player)
@@ -3986,7 +4200,7 @@ function EconomyService.GrantOffline(player: Player)
 	for _, t in pairs(data.Treasures) do
 		if t.Plot then
 			local def = TreasureData.Get(t.Id)
-			mps += def and def.MPS or 0
+			mps += def and def.MPS * Mutations.Multiplier(t.Mut) or 0
 		end
 	end
 	mps *= UpgradeData.IncomeMultiplier(data)
@@ -4016,7 +4230,12 @@ function EconomyService.Start()
 						if data.AutoCollect then
 							data.Money += gain
 						else
-							data.Vault = (data.Vault or 0) + gain
+							-- each stand fills up its own collect plate
+							local m = (session.IncomeMult or 1) * Config.IncomeTickSeconds
+							for plot, v in pairs(session.PlotIncome or {}) do
+								local key = tostring(plot)
+								data.PlotCash[key] = (data.PlotCash[key] or 0) + v * m
+							end
 						end
 						data.TotalEarned += gain
 					end
@@ -4029,7 +4248,7 @@ end
 
 return EconomyService
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000014"><Properties><string name="Name">EventService</string><ProtectedString name="Source"><![CDATA[-- EventService.lua
+<Item class="ModuleScript" referent="RBX00000015"><Properties><string name="Name">EventService</string><ProtectedString name="Source"><![CDATA[-- EventService.lua
 -- Timed world events that pull players to special locations:
 --   Double Money        - 2x income for everyone, fountain turns gold
 --   Meteor Shower       - meteors crash into the Meteor Crater dropping Epic+ loot
@@ -4149,6 +4368,25 @@ local function treasureRain()
 	setState(nil, 0)
 end
 
+-- Mutation events: everything that spawns has a big chance to mutate
+local function mutationEvent(name: string, title: string, text: string, rarity: string)
+	local d = 90
+	setState(title, d)
+	Remotes.Announce:FireAllClients(text, rarity)
+	S.TreasureService.EventMutation = name
+	task.wait(d)
+	S.TreasureService.EventMutation = nil
+	setState(nil, 0)
+end
+
+local function lavaEvent()
+	mutationEvent("Lava", "Lava Eruption", "🌋 LAVA ERUPTION! Treasures are spawning with the LAVA mutation (x2.5)!", "Mythical")
+end
+
+local function rainbowEvent()
+	mutationEvent("Rainbow", "Rainbow Storm", "🌈 RAINBOW STORM! Rainbow mutations (x2) everywhere!", "Divine")
+end
+
 local function apocalypse()
 	local d = Config.Events.ApocalypseDuration
 	setState("Treasure Apocalypse", d)
@@ -4228,6 +4466,8 @@ local EVENTS = {
 	{ Fn = secretSpawn, Weight = 10 },
 	{ Fn = apocalypse, Weight = 6 },
 	{ Fn = divineDescent, Weight = 6 },
+	{ Fn = lavaEvent, Weight = 10 },
+	{ Fn = rainbowEvent, Weight = 10 },
 }
 
 function EventService.RunRandom()
@@ -4261,6 +4501,8 @@ function EventService.Start()
 			Secret = secretSpawn,
 			Apocalypse = apocalypse,
 			Divine = divineDescent,
+			Lava = lavaEvent,
+			Rainbow = rainbowEvent,
 		}
 		S.NetService.Handle("DebugEvent", function(_, name)
 			local fn = byName[name]
@@ -4282,6 +4524,7 @@ function EventService.Start()
 				setState(nil, 0)
 				S.EconomyService.EventMultiplier = 1
 				S.EconomyService.EventLuck = 0
+				S.TreasureService.EventMutation = nil
 			end
 		end
 	end)
@@ -4289,7 +4532,231 @@ end
 
 return EventService
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000015"><Properties><string name="Name">LeaderboardService</string><ProtectedString name="Source"><![CDATA[-- LeaderboardService.lua
+<Item class="ModuleScript" referent="RBX00000016"><Properties><string name="Name">GearService</string><ProtectedString name="Source"><![CDATA[-- GearService.lua
+-- Gear tools bought with money: Speed Coil, Grapple Hook and Bear Traps (the
+-- Bonk Bat tiers live in StealService). Every use is validated on the server.
+
+local Players = game:GetService("Players")
+local Debris = game:GetService("Debris")
+
+local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
+local UpgradeData = require(Shared.UpgradeData)
+local Remotes = require(Shared.Remotes)
+local Util = require(Shared.Util)
+
+local S
+
+local GearService = {}
+
+local traps: { [Player]: { BasePart } } = {}
+local grappleCd: { [Player]: number } = {}
+
+local function handle(tool: Tool, color: Color3, size: Vector3, material: Enum.Material?)
+	local h = Instance.new("Part")
+	h.Name = "Handle"
+	h.Size = size
+	h.Color = color
+	h.Material = material or Enum.Material.Neon
+	h.CanCollide = false
+	h.Massless = true
+	h.Parent = tool
+	return h
+end
+
+local function makeTool(name: string, tip: string): Tool
+	local t = Instance.new("Tool")
+	t.Name = name
+	t.ToolTip = tip
+	t.CanBeDropped = false
+	return t
+end
+
+local function placeTrap(player: Player)
+	local char = player.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	local base = S.BaseService.Get(player)
+	if not hrp or not base then
+		return
+	end
+	if not S.BaseService.IsInside(base, hrp.Position) then
+		S.NetService.Notify(player, "Place traps inside your own base!", "error")
+		return
+	end
+	traps[player] = traps[player] or {}
+	local list = traps[player]
+	if #list >= 3 then
+		local old = table.remove(list, 1)
+		if old then
+			old:Destroy()
+		end
+	end
+	local trap = Instance.new("Part")
+	trap.Name = "BearTrap"
+	trap.Shape = Enum.PartType.Cylinder
+	trap.Size = Vector3.new(0.4, 3.4, 3.4)
+	trap.CFrame = CFrame.new(hrp.Position - Vector3.new(0, 2.8, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	trap.Color = Color3.fromRGB(110, 110, 120)
+	trap.Material = Enum.Material.DiamondPlate
+	trap.Anchored = true
+	trap.CanCollide = false
+	trap:SetAttribute("Owner", player.UserId)
+	local teeth = Instance.new("Part")
+	teeth.Shape = Enum.PartType.Cylinder
+	teeth.Size = Vector3.new(0.5, 2, 2)
+	teeth.CFrame = trap.CFrame
+	teeth.Color = Color3.fromRGB(255, 70, 70)
+	teeth.Material = Enum.Material.Neon
+	teeth.Anchored = true
+	teeth.CanCollide = false
+	teeth.CanTouch = false
+	teeth.Parent = trap
+	local sprung = false
+	trap.Touched:Connect(function(hit)
+		if sprung then
+			return
+		end
+		local victim = Players:GetPlayerFromCharacter(hit.Parent)
+		if not victim or victim == player then
+			return
+		end
+		sprung = true
+		local dropped = S.CarryService.DropStolen(victim)
+		Remotes.Effect:FireClient(victim, "Knockback", Vector3.new(0, 10, 0), 2.5)
+		S.NetService.Notify(victim, "🪤 SNAP! You stepped in a bear trap!", "error")
+		if player.Parent then
+			S.NetService.Notify(player, ("🪤 %s got caught in your trap!%s"):format(victim.DisplayName, dropped > 0 and " Loot recovered!" or ""), "success")
+		end
+		teeth.Size = Vector3.new(0.5, 3.2, 3.2)
+		Debris:AddItem(trap, 1)
+	end)
+	trap.Parent = workspace
+	table.insert(list, trap)
+	S.NetService.Notify(player, ("🪤 Trap placed (%d/3)"):format(#list), "success")
+end
+
+function GearService.GiveTools(player: Player)
+	local data = S.DataService.Get(player)
+	local backpack = player:FindFirstChildOfClass("Backpack") or player:WaitForChild("Backpack", 5)
+	if not data or not backpack then
+		return
+	end
+	local session = S.DataService.Session(player)
+	if data.Gear.SpeedCoil and not backpack:FindFirstChild("Speed Coil") then
+		local t = makeTool("Speed Coil", "Hold to run faster")
+		handle(t, Color3.fromRGB(80, 200, 255), Vector3.new(1, 1, 1))
+		t.Equipped:Connect(function()
+			if session then
+				session.CoilEquipped = true
+				S.PlayerService.ApplyMovement(player)
+			end
+		end)
+		t.Unequipped:Connect(function()
+			if session then
+				session.CoilEquipped = false
+				S.PlayerService.ApplyMovement(player)
+			end
+		end)
+		t.Parent = backpack
+	end
+	if data.Gear.Grapple and not backpack:FindFirstChild("Grapple Hook") then
+		local t = makeTool("Grapple Hook", "Click to zip to a spot")
+		handle(t, Color3.fromRGB(200, 200, 210), Vector3.new(0.6, 2, 0.6), Enum.Material.Metal)
+		t:SetAttribute("Grapple", true) -- the client sends the aim point
+		t.Parent = backpack
+	end
+	if data.Gear.Trap and not backpack:FindFirstChild("Bear Trap") then
+		local t = makeTool("Bear Trap", "Click inside your base to place a trap")
+		handle(t, Color3.fromRGB(110, 110, 120), Vector3.new(1.4, 0.4, 1.4), Enum.Material.DiamondPlate)
+		local cd = 0
+		t.Activated:Connect(function()
+			if os.clock() - cd > 1 then
+				cd = os.clock()
+				placeTrap(player)
+			end
+		end)
+		t.Parent = backpack
+	end
+end
+
+function GearService.Buy(player: Player, key)
+	local data = S.DataService.Get(player)
+	if not data or typeof(key) ~= "string" then
+		return false, "Bad request"
+	end
+	local item = UpgradeData.Gear[key]
+	if not item then
+		return false, "Unknown gear"
+	end
+	local cost
+	if key == "Bat" then
+		local lvl = data.Gear.Bat or 0
+		cost = item.Costs[lvl + 1]
+		if not cost then
+			return false, "Your bat is maxed!"
+		end
+	else
+		if data.Gear[key] then
+			return false, "You already own this"
+		end
+		cost = item.Cost
+	end
+	if data.Money < cost then
+		return false, ("Need %s more"):format(Util.Money(cost - data.Money))
+	end
+	data.Money -= cost
+	if key == "Bat" then
+		data.Gear.Bat = (data.Gear.Bat or 0) + 1
+		S.StealService.RefreshHammer(player)
+	else
+		data.Gear[key] = true
+		GearService.GiveTools(player)
+	end
+	Remotes.Effect:FireClient(player, "Purchase")
+	S.StateService.MarkFull(player)
+	return true, ("Got %s!"):format(key == "Bat" and UpgradeData.BatStats(data.Gear.Bat).Name or item.Name)
+end
+
+function GearService.Grapple(player: Player, target)
+	local data = S.DataService.Get(player)
+	local char = player.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not data or not data.Gear.Grapple or not hrp or typeof(target) ~= "Vector3" then
+		return false
+	end
+	local tool = char:FindFirstChild("Grapple Hook")
+	if not tool then
+		return false
+	end
+	if grappleCd[player] and os.clock() - grappleCd[player] < 4 then
+		return false
+	end
+	if (target - hrp.Position).Magnitude > 90 then
+		return false, "Too far!"
+	end
+	grappleCd[player] = os.clock()
+	Remotes.Effect:FireClient(player, "Grapple", target)
+	return true
+end
+
+function GearService.Init(services)
+	S = services
+end
+
+function GearService.Start()
+	S.NetService.Handle("BuyGear", GearService.Buy)
+	S.NetService.Handle("Grapple", GearService.Grapple)
+	Players.PlayerRemoving:Connect(function(p)
+		for _, t in ipairs(traps[p] or {}) do
+			t:Destroy()
+		end
+		traps[p] = nil
+		grappleCd[p] = nil
+	end)
+end
+
+return GearService
+]]></ProtectedString></Properties></Item>
+<Item class="ModuleScript" referent="RBX00000017"><Properties><string name="Name">LeaderboardService</string><ProtectedString name="Source"><![CDATA[-- LeaderboardService.lua
 -- Global leaderboards (OrderedDataStore) for Richest players and Most
 -- Rebirths, plus a live server board. Shown in the UI and on the physical
 -- board in the marketplace.
@@ -4492,7 +4959,7 @@ end
 
 return LeaderboardService
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000016"><Properties><string name="Name">MapBuilder</string><ProtectedString name="Source"><![CDATA[-- MapBuilder.lua
+<Item class="ModuleScript" referent="RBX00000018"><Properties><string name="Name">MapBuilder</string><ProtectedString name="Source"><![CDATA[-- MapBuilder.lua
 -- Builds the whole world procedurally at server start:
 --   central treasure marketplace (stalls, fountain, shop, rebirth altar, sell
 --   station, global leaderboard), 8 base slots, treasure fields, decorations,
@@ -4799,6 +5266,17 @@ local function buildPlaza(root: Instance, map)
 	spawn.Duration = 0
 	spawn.Neutral = true
 	spawn.Parent = plaza
+
+	-- the plaza is built around the origin, then moved to the parade's start
+	local offset = CFrame.new(Config.PlazaCenter)
+	for _, d in ipairs(plaza:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.CFrame = offset * d.CFrame
+		end
+	end
+	for _, st in ipairs(map.Stalls) do
+		st.CFrame = offset * st.CFrame
+	end
 end
 
 -- Fields ---------------------------------------------------------------------
@@ -4812,8 +5290,9 @@ local function buildFields(root: Instance, map)
 	map.Fields = {}
 	local names = { "Sunny Meadow", "Golden Grove", "Crystal Clearing", "Rainbow Patch", "Mushroom Hollow", "Starlight Glade", "Coral Garden", "Lucky Lawn" }
 	for i = 0, 7 do
-		local a = math.rad(22.5 + i * 45)
-		local center = Vector3.new(math.cos(a) * 140, 0, math.sin(a) * 140)
+		local col = Config.BaseColumnsX[i % 4 + 1]
+		local side = i < 4 and 1 or -1
+		local center = Vector3.new(col, 0, side * 190)
 		local m = Instance.new("Model")
 		m.Name = names[i + 1]
 		local color = FLOWER_COLORS[i % #FLOWER_COLORS + 1]
@@ -4835,50 +5314,111 @@ end
 -- Paths ------------------------------------------------------------------------
 local function buildPaths(root: Instance)
 	local paths = folder("Paths", root)
-	for i = 0, Config.MaxBases - 1 do
-		local a = math.rad(i * 45)
-		local dir = Vector3.new(math.cos(a), 0, math.sin(a))
-		local from, to = dir * 75, dir * (Config.BaseRingRadius - Config.BaseSize / 2)
-		local mid = (from + to) / 2
-		local len = (to - from).Magnitude
-		part(paths, Vector3.new(14, 0.3, len), CFrame.lookAt(mid + Vector3.new(0, 0.15, 0), to + Vector3.new(0, 0.15, 0)), Color3.fromRGB(230, 200, 150), Enum.Material.Sand)
-		part(paths, Vector3.new(16, 0.25, len), CFrame.lookAt(mid + Vector3.new(0, 0.12, 0), to + Vector3.new(0, 0.12, 0)), Color3.fromRGB(190, 160, 120), Enum.Material.Cobblestone)
+	local P = Config.Parade
+	-- wide stone promenades on both sides of the parade
+	for _, side in ipairs({ -1, 1 }) do
+		part(paths, Vector3.new(P.EndX - P.StartX + 40, 0.3, 26), CFrame.new(0, 0.15, side * 22), Color3.fromRGB(205, 190, 165), Enum.Material.Cobblestone)
+		-- short paths from the promenade to every base door
+		for _, x in ipairs(Config.BaseColumnsX) do
+			local z0, z1 = side * 34, side * (Config.BaseRowZ - Config.BaseSize / 2)
+			part(paths, Vector3.new(14, 0.3, math.abs(z1 - z0) + 2), CFrame.new(x, 0.16, (z0 + z1) / 2), Color3.fromRGB(230, 200, 150), Enum.Material.Sand)
+		end
 		-- lamp posts
-		for d = 90, Config.BaseRingRadius - 50, 40 do
-			for _, side in ipairs({ -1, 1 }) do
-				local perp = Vector3.new(-dir.Z, 0, dir.X) * side * 10
-				local p = dir * d + perp
-				part(paths, Vector3.new(0.6, 9, 0.6), CFrame.new(p + Vector3.new(0, 4.5, 0)), Color3.fromRGB(60, 60, 70), Enum.Material.Metal)
-				local bulb = ball(paths, 1.6, p + Vector3.new(0, 9.5, 0), Color3.fromRGB(255, 230, 160), Enum.Material.Neon)
-				local l = Instance.new("PointLight")
-				l.Range = 14
-				l.Brightness = 1
-				l.Color = Color3.fromRGB(255, 220, 150)
-				l.Parent = bulb
-			end
+		for x = P.StartX + 20, P.EndX - 20, 40 do
+			local p = Vector3.new(x, 0, side * 12)
+			part(paths, Vector3.new(0.6, 10, 0.6), CFrame.new(p + Vector3.new(0, 5, 0)), Color3.fromRGB(60, 60, 70), Enum.Material.Metal)
+			local bulb = ball(paths, 1.8, p + Vector3.new(0, 10.5, 0), Color3.fromRGB(255, 230, 160), Enum.Material.Neon)
+			local l = Instance.new("PointLight")
+			l.Range = 18
+			l.Brightness = 1.2
+			l.Color = Color3.fromRGB(255, 220, 150)
+			l.Parent = bulb
 		end
 	end
+	-- road from the plaza to the parade start
+	local plaza = Config.PlazaCenter
+	part(paths, Vector3.new(math.abs(P.StartX - plaza.X) - 60, 0.3, 30), CFrame.new((P.StartX + plaza.X + 60) / 2, 0.15, 0), Color3.fromRGB(230, 200, 150), Enum.Material.Sand)
+end
+
+-- Treasure Parade: the red carpet that treasures walk along (buy them as they pass!)
+local function buildParade(root: Instance, map)
+	local CollectionService = game:GetService("CollectionService")
+	local f = folder("TreasureParade", root)
+	local P = Config.Parade
+	local length = P.EndX - P.StartX
+	local mid = (P.StartX + P.EndX) / 2
+	part(f, Vector3.new(length + 8, 0.6, P.Width + 4), CFrame.new(mid, 0.3, P.Z), Color3.fromRGB(255, 200, 60), Enum.Material.Foil, { Name = "CarpetTrim" })
+	local carpet = part(f, Vector3.new(length + 8, 0.7, P.Width), CFrame.new(mid, 0.35, P.Z), Color3.fromRGB(200, 30, 50), Enum.Material.Fabric, { Name = "Carpet" })
+	-- flowing light along the carpet (animated Beam texture)
+	local a0 = Instance.new("Attachment")
+	a0.Position = Vector3.new(-length / 2, 0.4, 0)
+	a0.Parent = carpet
+	local a1 = Instance.new("Attachment")
+	a1.Position = Vector3.new(length / 2, 0.4, 0)
+	a1.Parent = carpet
+	local beam = Instance.new("Beam")
+	beam.Attachment0 = a0
+	beam.Attachment1 = a1
+	beam.Width0 = P.Width - 2
+	beam.Width1 = P.Width - 2
+	beam.FaceCamera = false
+	beam.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	beam.TextureMode = Enum.TextureMode.Static
+	beam.TextureLength = 10
+	beam.TextureSpeed = P.Speed / 10
+	beam.LightEmission = 0.6
+	beam.Transparency = NumberSequence.new(0.55)
+	beam.Color = ColorSequence.new(Color3.fromRGB(255, 220, 120))
+	beam.Parent = carpet
+	-- velvet rope posts along both edges
+	for x = P.StartX, P.EndX, 12 do
+		for _, side in ipairs({ -1, 1 }) do
+			local pos = Vector3.new(x, 0, P.Z + side * (P.Width / 2 + 2.5))
+			cyl(f, 3.4, 0.5, CFrame.new(pos + Vector3.new(0, 1.7, 0)), Color3.fromRGB(255, 205, 70), Enum.Material.Foil)
+			ball(f, 0.8, pos + Vector3.new(0, 3.6, 0), Color3.fromRGB(255, 220, 90), Enum.Material.Foil)
+		end
+	end
+	-- spawn + exit arches (glowing portals)
+	for _, info in ipairs({ { P.StartX - 6, Color3.fromRGB(120, 220, 255), "✨ TREASURE PARADE ✨" }, { P.EndX + 6, Color3.fromRGB(255, 120, 200), "👋 BYE BYE!" } }) do
+		local x, color = info[1], info[2]
+		part(f, Vector3.new(3, 22, 3), CFrame.new(x, 11, P.Z - P.Width / 2 - 3), Color3.fromRGB(250, 245, 235), Enum.Material.Marble)
+		part(f, Vector3.new(3, 22, 3), CFrame.new(x, 11, P.Z + P.Width / 2 + 3), Color3.fromRGB(250, 245, 235), Enum.Material.Marble)
+		part(f, Vector3.new(4, 3, P.Width + 10), CFrame.new(x, 23, P.Z), color, Enum.Material.SmoothPlastic)
+		local disc = part(f, Vector3.new(0.6, 19, P.Width + 2), CFrame.new(x, 10.5, P.Z), color, Enum.Material.ForceField, { CanCollide = false, Transparency = 0.2 })
+		CollectionService:AddTag(disc, "Pulse")
+		local sp = Instance.new("ParticleEmitter")
+		sp.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		sp.Color = ColorSequence.new(color, Color3.new(1, 1, 1))
+		sp.LightEmission = 1
+		sp.Rate = 30
+		sp.Speed = NumberRange.new(2, 5)
+		sp.SpreadAngle = Vector2.new(180, 180)
+		sp.Size = NumberSequence.new(0.8, 0)
+		sp.Parent = disc
+		local sign = part(f, Vector3.new(1, 1, 1), CFrame.new(x, 28, P.Z), Color3.new(), nil, { Transparency = 1, CanCollide = false, CanQuery = false })
+		billboardText(sign, info[3], color:Lerp(Color3.new(1, 1, 1), 0.3), UDim2.fromOffset(360, 70), 0).MaxDistance = 600
+	end
+	map.Parade = {
+		Start = Vector3.new(P.StartX, 0.7, P.Z),
+		End = Vector3.new(P.EndX, 0.7, P.Z),
+	}
 end
 
 -- Decorations & border ---------------------------------------------------------------
 local function isClear(pos: Vector3, map): boolean
 	local flat = Vector3.new(pos.X, 0, pos.Z)
-	if flat.Magnitude < 90 then
+	-- plaza
+	if (flat - Config.PlazaCenter).Magnitude < 100 then
 		return false
 	end
-	for i = 0, Config.MaxBases - 1 do
-		local a = math.rad(i * 45)
-		local c = Vector3.new(math.cos(a), 0, math.sin(a)) * Config.BaseRingRadius
-		if (flat - c).Magnitude < 62 then
-			return false
-		end
-		-- keep the path corridor free
-		local dir = c.Unit
-		local along = flat:Dot(dir)
-		local perp = (flat - dir * along).Magnitude
-		if along > 0 and along < Config.BaseRingRadius and perp < 16 then
-			return false
-		end
+	-- the whole base district: parade, promenades and both base rows
+	local reach = Config.BaseRowZ + Config.BaseSize / 2 + 18
+	if math.abs(flat.X) < 290 and math.abs(flat.Z) < reach then
+		return false
+	end
+	-- road from the plaza
+	if flat.X < -240 and flat.X > Config.PlazaCenter.X and math.abs(flat.Z) < 25 then
+		return false
 	end
 	for _, f in ipairs(map.Fields) do
 		if (flat - f.Center).Magnitude < 30 then
@@ -5169,6 +5709,7 @@ function MapBuilder.Build()
 	buildPlaza(root, map)
 	buildFields(root, map)
 	buildPaths(root)
+	buildParade(root, map)
 	buildSecretCave(root, map)
 	buildSkyIsland(root, map)
 	buildVault(root, map)
@@ -5182,9 +5723,11 @@ function MapBuilder.Build()
 	-- Base slot transforms (BaseService builds the bases themselves)
 	map.BaseSlots = {}
 	for i = 1, Config.MaxBases do
-		local a = math.rad((i - 1) * 45)
-		local pos = Vector3.new(math.cos(a), 0, math.sin(a)) * Config.BaseRingRadius
-		map.BaseSlots[i] = CFrame.lookAt(pos, Vector3.new(0, 0, 0))
+		local col = Config.BaseColumnsX[(i - 1) % 4 + 1]
+		local side = i <= 4 and 1 or -1
+		local pos = Vector3.new(col, 0, side * Config.BaseRowZ)
+		-- each base's door faces the parade
+		map.BaseSlots[i] = CFrame.lookAt(pos, Vector3.new(col, 0, 0))
 	end
 
 	MapBuilder.Map = map
@@ -5231,13 +5774,17 @@ end
 
 return MapBuilder
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000017"><Properties><string name="Name">MapDetails</string><ProtectedString name="Source"><![CDATA[-- MapDetails.lua
+<Item class="ModuleScript" referent="RBX00000019"><Properties><string name="Name">MapDetails</string><ProtectedString name="Source"><![CDATA[-- MapDetails.lua
 -- Extra world detail built on top of MapBuilder: terrain lake with a dock and
 -- lighthouse, rolling hills, pine forests, windmill farm, pet & gem shops,
 -- animated portals, market flags, chest spawn spots and CollectionService
 -- tags that the client animates (Spin, Bob, Pulse, Flag, Lamp, Tree).
 
 local CollectionService = game:GetService("CollectionService")
+
+local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
+local Config = require(Shared.Config)
+local PLAZA = Config.PlazaCenter
 
 local MapDetails = {}
 
@@ -5323,8 +5870,8 @@ end
 -- Buildings ------------------------------------------------------------------------
 local function shopBuilding(root, M, angleDeg: number, name: string, label: string, color: Color3, ui: string, action: string)
 	local a = math.rad(angleDeg)
-	local pos = Vector3.new(math.cos(a) * 64, 1.2, math.sin(a) * 64)
-	local cf = CFrame.lookAt(pos, Vector3.new(0, 1.2, 0))
+	local pos = PLAZA + Vector3.new(math.cos(a) * 64, 1.2, math.sin(a) * 64)
+	local cf = CFrame.lookAt(pos, PLAZA + Vector3.new(0, 1.2, 0))
 	local m = Instance.new("Model")
 	m.Name = name
 	local white = Color3.fromRGB(250, 248, 240)
@@ -5449,10 +5996,10 @@ local function buildPortals(root, map, M)
 	local portals = folder("Portals", root)
 	local function plazaCF(angleDeg)
 		local a = math.rad(angleDeg)
-		local pos = Vector3.new(math.cos(a) * 96, 0, math.sin(a) * 96)
-		return CFrame.lookAt(pos, Vector3.new(0, 0, 0)), pos
+		local pos = PLAZA + Vector3.new(math.cos(a) * 96, 0, math.sin(a) * 96)
+		return CFrame.lookAt(pos, PLAZA), pos
 	end
-	local home = Vector3.new(0, 4, 30)
+	local home = PLAZA + Vector3.new(0, 4, 30)
 	local sky = Vector3.new(330, 156, 330)
 	local crater = map.Crater.Center + (-map.Crater.Center).Unit * 50 + Vector3.new(0, 4, 0)
 	local shrine = Vector3.new(380, 0, -320) + (-Vector3.new(380, 0, -320)).Unit * 42 + Vector3.new(0, 4, 0)
@@ -5492,7 +6039,7 @@ local function pine(parent, M, pos: Vector3, scale: number)
 end
 
 local FORESTS = {
-	{ Name = "Whispering Woods", Center = Vector3.new(-470, 0, -40), R = 80 },
+	{ Name = "Whispering Woods", Center = Vector3.new(-520, 0, -200), R = 75 },
 	{ Name = "Pinecrest Forest", Center = Vector3.new(100, 0, 480), R = 70 },
 	{ Name = "Shadow Grove", Center = Vector3.new(-200, 0, -450), R = 65 },
 }
@@ -5541,7 +6088,7 @@ local function decorate(root, map, M)
 	local plaza = root:FindFirstChild("Marketplace")
 	for i = 0, 11 do
 		local a = i / 12 * math.pi * 2 + 0.13
-		local pos = Vector3.new(math.cos(a) * 74, 0, math.sin(a) * 74)
+		local pos = PLAZA + Vector3.new(math.cos(a) * 74, 0, math.sin(a) * 74)
 		M.Part(plaza, Vector3.new(0.5, 16, 0.5), CFrame.new(pos + Vector3.new(0, 8, 0)), Color3.fromRGB(240, 240, 240), Enum.Material.Metal)
 		local flag = M.Part(plaza, Vector3.new(0.15, 3, 5), CFrame.new(pos + Vector3.new(0, 14.5, 2.6)), Color3.fromHSV(i / 12, 0.7, 1), Enum.Material.Fabric, { CanCollide = false })
 		tag(flag, "Flag", { SwayAmount = 0.25 })
@@ -5628,7 +6175,7 @@ end
 
 return MapDetails
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000018"><Properties><string name="Name">NetService</string><ProtectedString name="Source"><![CDATA[-- NetService.lua
+<Item class="ModuleScript" referent="RBX0000001A"><Properties><string name="Name">NetService</string><ProtectedString name="Source"><![CDATA[-- NetService.lua
 -- Single entry point for all client requests. Every request is rate limited,
 -- type checked by its handler and wrapped in pcall so a bad request can never
 -- break the server. Handlers return (ok: boolean, message: string?, extra: any?).
@@ -5690,7 +6237,7 @@ end
 
 return NetService
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000019"><Properties><string name="Name">PetService</string><ProtectedString name="Source"><![CDATA[-- PetService.lua
+<Item class="ModuleScript" referent="RBX0000001B"><Properties><string name="Name">PetService</string><ProtectedString name="Source"><![CDATA[-- PetService.lua
 -- Pets: hatching eggs (server-side rolls with luck), equipping, deleting and
 -- applying pet bonuses (income, luck, speed, gems). Equipped pets are
 -- published as a player attribute; every client renders and animates the
@@ -5894,7 +6441,7 @@ end
 
 return PetService
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX0000001A"><Properties><string name="Name">PlayerService</string><ProtectedString name="Source"><![CDATA[-- PlayerService.lua
+<Item class="ModuleScript" referent="RBX0000001C"><Properties><string name="Name">PlayerService</string><ProtectedString name="Source"><![CDATA[-- PlayerService.lua
 -- Player lifecycle: leaderstats, base assignment, character setup (spawn at
 -- base, movement stats, Bonk Hammer, overhead name tag, rebirth trail),
 -- death handling and the settings / title remotes.
@@ -5920,6 +6467,9 @@ function PlayerService.ApplyMovement(player: Player)
 	local speed = UpgradeData.WalkSpeed(data, session.PetBonus and session.PetBonus.Speed or 0)
 	if #session.Carrying > 0 then
 		speed *= S.CarryService.IsCarryingStolen(player) and 0.85 or 0.95
+	end
+	if session.CoilEquipped then
+		speed += 6
 	end
 	if session.Sprinting and session.Stamina > 0 then
 		speed *= Config.Sprint.Multiplier
@@ -6062,6 +6612,7 @@ local function setupCharacter(player: Player, char: Model)
 	PlayerService.UpdateOverhead(player)
 	PlayerService.ApplyTrail(player)
 	S.StealService.GiveHammer(player)
+	S.GearService.GiveTools(player)
 	hum.Died:Connect(function()
 		S.CarryService.OnDied(player, hrp.Position)
 	end)
@@ -6223,7 +6774,7 @@ end
 
 return PlayerService
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX0000001B"><Properties><string name="Name">RebirthService</string><ProtectedString name="Source"><![CDATA[-- RebirthService.lua
+<Item class="ModuleScript" referent="RBX0000001D"><Properties><string name="Name">RebirthService</string><ProtectedString name="Source"><![CDATA[-- RebirthService.lua
 -- Rebirth: trade your money, treasures and upgrades for a permanent income
 -- and speed bonus, plus exclusive treasures, titles and trails at milestones.
 -- Abilities, the treasure index, secrets, titles and exclusive treasures are kept.
@@ -6250,6 +6801,17 @@ function RebirthService.Rebirth(player: Player)
 	end
 	if #session.Carrying > 0 then
 		return false, "Deliver what you're carrying first"
+	end
+	local req = Config.RebirthRequirement(data.Rebirths)
+	local have = 0
+	for _, t in pairs(data.Treasures) do
+		local d = TreasureData.Get(t.Id)
+		if d and not d.Exclusive and require(Shared.Rarities).Rank(d.Rarity) >= require(Shared.Rarities).Rank(req.Rarity) then
+			have += 1
+		end
+	end
+	if have < req.Count then
+		return false, ("Rebirth %d needs %d %s+ treasure%s (you have %d)"):format(data.Rebirths + 1, req.Count, req.Rarity, req.Count > 1 and "s" or "", have)
 	end
 	if session.Trade then
 		return false, "Finish your trade first"
@@ -6305,6 +6867,7 @@ function RebirthService.Rebirth(player: Player)
 	S.PlayerService.ApplyTrail(player)
 	data.Gems += Config.Gems.Rebirth
 	data.Vault = 0
+	data.PlotCash = {}
 	S.PlayerService.Emote(player, "Victory", 5)
 	S.StateService.MarkFull(player)
 	task.spawn(S.DataService.Save, player, false)
@@ -6326,7 +6889,7 @@ end
 
 return RebirthService
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX0000001C"><Properties><string name="Name">ShopService</string><ProtectedString name="Source"><![CDATA[-- ShopService.lua
+<Item class="ModuleScript" referent="RBX0000001E"><Properties><string name="Name">ShopService</string><ProtectedString name="Source"><![CDATA[-- ShopService.lua
 -- Upgrade shop + special abilities (purchase and server-validated use).
 
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
@@ -6538,7 +7101,7 @@ end
 
 return ShopService
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX0000001D"><Properties><string name="Name">StateService</string><ProtectedString name="Source"><![CDATA[-- StateService.lua
+<Item class="ModuleScript" referent="RBX0000001F"><Properties><string name="Name">StateService</string><ProtectedString name="Source"><![CDATA[-- StateService.lua
 -- Replicates player state to its owning client. Two channels:
 --   FullState: everything (inventory, upgrades, settings ...) when it changes
 --   Stats:     small, frequent payload (money, mps, timers, carrying)
@@ -6552,6 +7115,14 @@ local Config = require(Shared.Config)
 local UpgradeData = require(Shared.UpgradeData)
 local Remotes = require(Shared.Remotes)
 local Util = require(Shared.Util)
+
+local function uncollected(data): number
+	local total = data.Vault or 0
+	for _, v in pairs(data.PlotCash or {}) do
+		total += v
+	end
+	return total
+end
 
 local S
 
@@ -6582,6 +7153,7 @@ local function buildFull(player: Player)
 			Uid = uid,
 			Id = t.Id,
 			Plot = t.Plot,
+			Mut = t.Mut,
 			Stealing = session.Stealing[uid] ~= nil,
 			InTrade = table.find(tradeOffer, uid) ~= nil,
 		})
@@ -6605,7 +7177,7 @@ local function buildFull(player: Player)
 	return {
 		Money = data.Money,
 		Gems = data.Gems,
-		Vault = data.Vault,
+		Vault = uncollected(data),
 		Pets = pets,
 		PetSlots = UpgradeData.PetSlots(data),
 		Achievements = achievements,
@@ -6637,6 +7209,8 @@ local function buildFull(player: Player)
 		BaseIndex = session.BaseIndex,
 		Multiplier = UpgradeData.IncomeMultiplier(data, session.Aura, session.PetBonus.Money),
 		RebirthCost = Config.RebirthCost(data.Rebirths),
+		RebirthReq = Config.RebirthRequirement(data.Rebirths),
+		Gear = data.Gear,
 		LockDuration = UpgradeData.LockDuration(data),
 		CanSave = S.DataService.CanSave(),
 	}
@@ -6655,7 +7229,7 @@ local function buildStats(player: Player)
 	return {
 		Money = data.Money,
 		Gems = data.Gems,
-		Vault = data.Vault,
+		Vault = uncollected(data),
 		Stamina = session.Stamina,
 		MaxStamina = Config.Sprint.MaxStamina,
 		Luck = S.EconomyService.Luck(player),
@@ -6745,7 +7319,7 @@ end
 
 return StateService
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX0000001E"><Properties><string name="Name">StealService</string><ProtectedString name="Source"><![CDATA[-- StealService.lua
+<Item class="ModuleScript" referent="RBX00000020"><Properties><string name="Name">StealService</string><ProtectedString name="Source"><![CDATA[-- StealService.lua
 -- Server-authoritative stealing:
 --   validation (locks, shields, cooldowns, distance, capacity, ownership),
 --   alarms, delivery, returning treasure, post-robbery lockdown and the
@@ -6794,6 +7368,9 @@ function StealService.CanSteal(thief: Player, owner: Player, uid: string)
 	end
 	if oSes.Stealing[uid] then
 		return false, "Someone is already stealing that!"
+	end
+	if oSes.Arriving[uid] then
+		return false, "It's still walking home — wait for it to reach its stand!"
 	end
 	if oSes.LockEnd > t then
 		return false, "This base is locked! 🔒"
@@ -6850,6 +7427,7 @@ function StealService.TryStart(thief: Player, owner: Player, uid: string)
 	S.BaseService.Refresh(owner)
 	S.CarryService.Add(thief, {
 		Id = entry.Id,
+		Mut = entry.Mut,
 		Source = "Steal",
 		Victim = owner,
 		VictimUid = uid,
@@ -6912,7 +7490,7 @@ function StealService.Complete(thief: Player, item)
 		tData.Stats.Steals += 1
 	end
 
-	S.TreasureService.Give(thief, item.Id, { Source = "Steal" })
+	S.TreasureService.Give(thief, item.Id, { Source = "Steal", Mutation = item.Mut })
 	S.EconomyService.AddXP(thief, Config.XP.Steal)
 	S.PlayerService.Emote(thief, "Victory", 4)
 
@@ -6948,6 +7526,7 @@ end
 local function makeHammer(): Tool
 	local tool = Instance.new("Tool")
 	tool.Name = "Bonk Hammer"
+	tool:SetAttribute("Bat", true)
 	tool.ToolTip = "Bonk thieves to recover stolen treasure!"
 	tool.CanBeDropped = false
 	tool.RequiresHandle = true
@@ -7024,6 +7603,9 @@ local function onSwing(player: Player, tool: Tool)
 			tool.Grip = CFrame.new(0, -1.2, 0)
 		end
 	end)
+	-- bat tier stats
+	local pdata = S.DataService.Get(player)
+	local bat = UpgradeData.BatStats(pdata and pdata.Gear and pdata.Gear.Bat or 0)
 	-- find a target in front of us
 	for _, other in ipairs(Players:GetPlayers()) do
 		if other ~= player then
@@ -7031,7 +7613,7 @@ local function onSwing(player: Player, tool: Tool)
 			if ohrp then
 				local offset = ohrp.Position - hrp.Position
 				local dist = offset.Magnitude
-				if dist <= Config.Steal.BonkRange and (dist < 3 or hrp.CFrame.LookVector:Dot(offset.Unit) > 0.2) then
+				if dist <= bat.Range and (dist < 3 or hrp.CFrame.LookVector:Dot(offset.Unit) > 0.2) then
 					local hitSound = handle and handle:FindFirstChild("Hit")
 					if hitSound then
 						hitSound:Play()
@@ -7040,7 +7622,7 @@ local function onSwing(player: Player, tool: Tool)
 					if S.CarryService.IsCarryingStolen(other) then
 						recovered = S.CarryService.DropStolen(other)
 					end
-					Remotes.Effect:FireClient(other, "Knockback", (offset.Unit + Vector3.new(0, 0.6, 0)) * 60, Config.Steal.BonkStun)
+					Remotes.Effect:FireClient(other, "Knockback", (offset.Unit + Vector3.new(0, 0.6, 0)) * bat.Knock, bat.Stun)
 					Remotes.Effect:FireClient(player, "BonkHit", ohrp.Position)
 					if recovered > 0 then
 						local data = S.DataService.Get(player)
@@ -7060,14 +7642,46 @@ end
 
 function StealService.GiveHammer(player: Player)
 	local backpack = player:FindFirstChildOfClass("Backpack") or player:WaitForChild("Backpack", 5)
-	if not backpack or backpack:FindFirstChild("Bonk Hammer") then
+	if not backpack then
+		return
+	end
+	for _, t in ipairs(backpack:GetChildren()) do
+		if t:GetAttribute("Bat") then
+			return
+		end
+	end
+	if player.Character and player.Character:FindFirstChildWhichIsA("Tool") and player.Character:FindFirstChildWhichIsA("Tool"):GetAttribute("Bat") then
 		return
 	end
 	local tool = hammerTemplate:Clone()
+	local data = S.DataService.Get(player)
+	local stats = UpgradeData.BatStats(data and data.Gear and data.Gear.Bat or 0)
+	tool.Name = stats.Name
+	local head = tool:FindFirstChild("Head")
+	if head then
+		head.Color = stats.Color
+		if (data and data.Gear and data.Gear.Bat or 0) >= 2 then
+			head.Material = Enum.Material.Neon
+		end
+	end
 	tool.Activated:Connect(function()
 		onSwing(player, tool)
 	end)
 	tool.Parent = backpack
+end
+
+-- Replace the bat after a tier upgrade
+function StealService.RefreshHammer(player: Player)
+	for _, holder in ipairs({ player:FindFirstChildOfClass("Backpack"), player.Character }) do
+		if holder then
+			for _, t in ipairs(holder:GetChildren()) do
+				if t:IsA("Tool") and t:GetAttribute("Bat") then
+					t:Destroy()
+				end
+			end
+		end
+	end
+	StealService.GiveHammer(player)
 end
 
 function StealService.Init(services)
@@ -7081,7 +7695,7 @@ end
 
 return StealService
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX0000001F"><Properties><string name="Name">TradeService</string><ProtectedString name="Source"><![CDATA[-- TradeService.lua
+<Item class="ModuleScript" referent="RBX00000021"><Properties><string name="Name">TradeService</string><ProtectedString name="Source"><![CDATA[-- TradeService.lua
 -- Player-to-player trading, fully server validated:
 --   request -> accept -> both sides set offers (treasures + money) -> both
 --   ready -> 3 second confirm countdown (any change cancels ready) -> atomic
@@ -7114,7 +7728,7 @@ local function view(trade, player: Player)
 		for _, uid in ipairs(trade.Offers[p].Uids) do
 			local t = data and data.Treasures[uid]
 			if t then
-				table.insert(items, { Uid = uid, Id = t.Id })
+				table.insert(items, { Uid = uid, Id = t.Id, Mut = t.Mut })
 			end
 		end
 		local pets = {}
@@ -7233,7 +7847,7 @@ local function execute(trade)
 	for _, pair in ipairs({ { trade.A, aData }, { trade.B, bData } }) do
 		local p, data = pair[1], pair[2]
 		for _, uid in ipairs(trade.Offers[p].Uids) do
-			table.insert(moving[p], data.Treasures[uid].Id)
+			table.insert(moving[p], { Id = data.Treasures[uid].Id, Mut = data.Treasures[uid].Mut })
 			data.Treasures[uid] = nil
 		end
 		for _, uid in ipairs(trade.Offers[p].Pets) do
@@ -7250,13 +7864,13 @@ local function execute(trade)
 			end
 			data.Pets[uid] = { Id = id, Equipped = false }
 		end
-		for _, id in ipairs(ids) do
+		for _, item in ipairs(ids) do
 			local uid = Util.NewUid()
 			while data.Treasures[uid] do
 				uid = Util.NewUid()
 			end
-			data.Treasures[uid] = { Id = id, Plot = nil }
-			data.Index[id] = true
+			data.Treasures[uid] = { Id = item.Id, Plot = nil, Mut = item.Mut }
+			data.Index[item.Id] = true
 		end
 		data.Money += money
 		data.Stats.Trades += 1
@@ -7473,7 +8087,7 @@ end
 
 return TradeService
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000020"><Properties><string name="Name">TreasureService</string><ProtectedString name="Source"><![CDATA[-- TreasureService.lua
+<Item class="ModuleScript" referent="RBX00000022"><Properties><string name="Name">TreasureService</string><ProtectedString name="Source"><![CDATA[-- TreasureService.lua
 -- Treasure ownership + the world economy:
 --   * free treasures spawning in fields / secret areas / events
 --   * the central marketplace stalls (buy with money, carry home)
@@ -7491,10 +8105,12 @@ local Rarities = require(Shared.Rarities)
 local Remotes = require(Shared.Remotes)
 local Util = require(Shared.Util)
 local Motion = require(Shared.Motion)
+local Mutations = require(Shared.Mutations)
 
 local S
 
 local TreasureService = {}
+TreasureService.EventMutation = nil -- set by events (e.g. "Lava", "Rainbow")
 TreasureService.World = {} :: { [string]: any }
 
 local rng = Random.new()
@@ -7555,7 +8171,21 @@ function TreasureService.Give(player: Player, id: string, opts)
 		uid = Util.NewUid()
 	end
 	local plot = (not opts.NoAutoPlace) and S.BaseService.FreePlot(player) or nil
-	data.Treasures[uid] = { Id = id, Plot = plot }
+	data.Treasures[uid] = { Id = id, Plot = plot, Mut = opts.Mutation }
+	-- bought on the parade: the treasure walks itself home to its stand
+	local session = S.DataService.Session(player)
+	if plot and opts.WalkFrom and session then
+		local base = S.BaseService.Get(player)
+		local target = base and base.Plots[plot] and base.Plots[plot].Plot.Position or opts.WalkFrom
+		local walkTime = math.clamp((target - opts.WalkFrom).Magnitude / 14, 2, 14)
+		session.Arriving[uid] = { From = opts.WalkFrom, At = now() + walkTime }
+		task.delay(walkTime, function()
+			if session.Arriving[uid] then
+				session.Arriving[uid] = nil
+				S.StateService.MarkFull(player)
+			end
+		end)
+	end
 	data.Stats.Collected += 1
 
 	-- discovery bonus
@@ -7574,9 +8204,10 @@ function TreasureService.Give(player: Player, id: string, opts)
 			S.NetService.Notify(player, ("📖 NEW DISCOVERY: %s! +%s"):format(def.Name, Util.Money(bonus)), "discovery")
 		end
 	elseif not opts.Silent then
-		S.NetService.Notify(player, ("+ %s (%s)%s"):format(def.Name, def.Rarity, plot and "" or " → storage"), "success")
+		local mutText = opts.Mutation and (" " .. Mutations.Label(opts.Mutation)) or ""
+		S.NetService.Notify(player, ("+ %s (%s)%s%s"):format(def.Name, def.Rarity, mutText, plot and "" or " → storage"), "success")
 	end
-	local xp = opts.Source == "Market" and Config.XP.Buy or Config.XP.Collect
+	local xp = (opts.Source == "Market" or opts.Source == "Parade") and Config.XP.Buy or Config.XP.Collect
 	if opts.Source ~= "Steal" and opts.Source ~= "Trade" and opts.Source ~= "Rebirth" then
 		S.EconomyService.AddXP(player, xp)
 	end
@@ -7666,7 +8297,7 @@ local function sellOne(player: Player, data, session, uid: string): number?
 		return nil
 	end
 	local def = TreasureData.Get(entry.Id)
-	local value = def and math.floor(def.Value * Config.SellMultiplier) or 0
+	local value = def and math.floor(def.Value * Mutations.Multiplier(entry.Mut) * Config.SellMultiplier) or 0
 	data.Treasures[uid] = nil
 	return value
 end
@@ -7741,6 +8372,10 @@ end
 
 -- Current server-side position of a world treasure (accounts for wandering).
 function TreasureService.WorldPosition(record): Vector3
+	if record.Parade then
+		local p = record.Parade
+		return p.From + p.Dir * (p.Speed * (now() - p.Start))
+	end
 	if record.Seed then
 		return Motion.Position(record.Home, record.Seed, now(), Config.World.WanderRadius)
 	end
@@ -7774,12 +8409,19 @@ local tryPickup -- forward
 
 function TreasureService.SpawnWorld(def, cf: CFrame, kind: string, extra)
 	local uid = Util.NewUid()
-	local scale = kind == "Market" and 1.1 or 1
-	local model = TreasureModels.Build(def, { CFrame = cf, Scale = scale })
+	local scale = (kind == "Market" or kind == "Parade") and 1.15 or 1
+	local mutation = extra and extra.Mutation
+	local model = TreasureModels.Build(def, { CFrame = cf, Scale = scale, Mutation = mutation })
 	model:SetAttribute("WorldUid", uid)
 	model:SetAttribute("Kind", kind)
+	if extra and extra.Parade then
+		model:SetAttribute("ParadeStart", extra.Parade.Start)
+		model:SetAttribute("ParadeFrom", extra.Parade.From)
+		model:SetAttribute("ParadeDir", extra.Parade.Dir)
+		model:SetAttribute("ParadeSpeed", extra.Parade.Speed)
+	end
 	local root = model.PrimaryPart :: BasePart
-	local label = S.BaseService.MakeLabel(root, def, TreasureModels.Height(def, scale))
+	local label = S.BaseService.MakeLabel(root, def, TreasureModels.Height(def, scale), mutation)
 	label.MaxDistance = 90
 	local price = extra and extra.Price
 	if price then
@@ -7826,6 +8468,8 @@ function TreasureService.SpawnWorld(def, cf: CFrame, kind: string, extra)
 		Model = model,
 		Home = cf,
 		Seed = wander and seed or nil,
+		Mutation = mutation,
+		Parade = extra and extra.Parade,
 		Spawned = os.clock(),
 		Price = price,
 		Region = extra and extra.Region,
@@ -7837,7 +8481,7 @@ function TreasureService.SpawnWorld(def, cf: CFrame, kind: string, extra)
 	end)
 	model.Parent = worldFolder
 	if Rarities.Info[def.Rarity].Announce and kind ~= "Event" then
-		local where = kind == "Market" and "the Treasure Market" or (extra and extra.Region) or "the world"
+		local where = (kind == "Market" or kind == "Parade") and "the Treasure Parade" or (extra and extra.Region) or "the world"
 		Remotes.Announce:FireAllClients(("✨ A %s %s appeared in %s!"):format(def.Rarity, def.Name, tostring(where)), def.Rarity)
 	end
 	return record
@@ -7870,7 +8514,7 @@ tryPickup = function(player: Player, uid: string)
 		S.NetService.Notify(player, "Finish your trade first", "error")
 		return false
 	end
-	if not S.CarryService.CanCarry(player) then
+	if not record.Price and not S.CarryService.CanCarry(player) then
 		S.NetService.Notify(player, "Your hands are full! Bring your treasure home first.", "error")
 		return false
 	end
@@ -7884,6 +8528,14 @@ tryPickup = function(player: Player, uid: string)
 			return false
 		end
 		data.Money -= record.Price
+		-- Bought! It walks itself to your base (no carrying needed).
+		local from = TreasureService.WorldPosition(record)
+		TreasureService.RemoveWorld(uid, false)
+		S.TreasureService.Give(player, record.Id, { Source = "Parade", Mutation = record.Mutation, WalkFrom = from })
+		Remotes.Effect:FireClient(player, "Purchase")
+		S.NetService.Notify(player, "🛒 Purchased! It's walking to your base.", "success")
+		S.StateService.PushStats(player)
+		return true
 	end
 	TreasureService.RemoveWorld(uid, true)
 	-- Luck: chance to upgrade a free treasure by one rarity tier
@@ -7900,11 +8552,8 @@ tryPickup = function(player: Player, uid: string)
 			end
 		end
 	end
-	S.CarryService.Add(player, { Id = id, Source = record.Kind })
+	S.CarryService.Add(player, { Id = id, Source = record.Kind, Mut = record.Mutation })
 	Remotes.Effect:FireClient(player, "Pickup", TreasureData.Get(id).Rarity)
-	if record.Price then
-		S.NetService.Notify(player, "Purchased! Carry it back to your base.", "success")
-	end
 	S.StateService.PushStats(player)
 	return true
 end
@@ -7926,7 +8575,8 @@ local function spawnInField(field, pool)
 	local pos = field.Center + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
 	local ground = groundAt(pos)
 	local def = TreasureData.RollFromPool(pool or Config.SpawnPools.Field, rng)
-	return TreasureService.SpawnWorld(def, CFrame.new(ground) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0), "Field", { Region = field.Name })
+	local mutation = Mutations.Roll(rng, 1 + S.EconomyService.EventLuck, TreasureService.EventMutation)
+	return TreasureService.SpawnWorld(def, CFrame.new(ground) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0), "Field", { Region = field.Name, Mutation = mutation })
 end
 TreasureService.SpawnInField = spawnInField
 
@@ -7997,6 +8647,33 @@ function TreasureService.Start()
 
 	restockMarket()
 
+	-- Treasure Parade: a new treasure walks onto the carpet every few seconds
+	task.spawn(function()
+		local parade = S.MapBuilder.Map.Parade
+		local P = Config.Parade
+		local dir = (parade.End - parade.Start).Unit
+		local lifetime = (parade.End - parade.Start).Magnitude / P.Speed
+		while true do
+			local luck = 1 + S.EconomyService.EventLuck
+			local pool = Config.SpawnPools.Market
+			if S.EconomyService.EventLuck > 0 then
+				pool = Config.SpawnPools.Lucky
+			end
+			local def = TreasureData.RollFromPool(pool, rng)
+			local mutation = Mutations.Roll(rng, luck, TreasureService.EventMutation)
+			local price = math.floor(def.Value * Mutations.Multiplier(mutation) * Config.Market.PriceMultiplier)
+			local start = now()
+			TreasureService.SpawnWorld(def, CFrame.lookAt(parade.Start, parade.Start + dir), "Parade", {
+				Price = price,
+				Mutation = mutation,
+				Region = "Parade",
+				Lifetime = lifetime,
+				Parade = { Start = start, From = parade.Start, Dir = dir, Speed = P.Speed },
+			})
+			task.wait(P.Interval)
+		end
+	end)
+
 	-- spawn + cleanup loop
 	task.spawn(function()
 		local fieldTimer, secretTimer = 0, 0
@@ -8026,6 +8703,7 @@ function TreasureService.Start()
 			local t = os.clock()
 			for uid, w in pairs(TreasureService.World) do
 				if w.Kind ~= "Market" and t - w.Spawned > w.Lifetime then
+					-- parade treasures that reach the exit arch disappear
 					TreasureService.RemoveWorld(uid, true)
 				end
 			end
@@ -8036,7 +8714,7 @@ function TreasureService.Start()
 				remaining = Config.Market.RestockSeconds
 			end
 			if marketSign then
-				marketSign.Text = ("🛒 New stock in %ds"):format(math.ceil(remaining))
+				marketSign.Text = "🛒 Buy treasures on the Treasure Parade →"
 			end
 		end
 	end)
@@ -8072,7 +8750,7 @@ function TreasureService.Start()
 					if data.Abilities.Magnet then
 						local radius = 18
 						for uid, w in pairs(TreasureService.World) do
-							if w.Kind ~= "Market" and w.Model then
+							if w.Kind ~= "Market" and w.Kind ~= "Parade" and w.Model then
 								if (TreasureService.WorldPosition(w) - hrp.Position).Magnitude <= radius then
 									if not S.CarryService.CanCarry(player) then
 										break
@@ -8093,7 +8771,7 @@ end
 
 return TreasureService
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000021"><Properties><string name="Name">WorldService</string><ProtectedString name="Source"><![CDATA[-- WorldService.lua
+<Item class="ModuleScript" referent="RBX00000023"><Properties><string name="Name">WorldService</string><ProtectedString name="Source"><![CDATA[-- WorldService.lua
 -- Living world systems:
 --   * day/night cycle (server publishes the clock; clients render it smoothly)
 --   * weather (Clear, Cloudy, Rain, Storm, Fog) + wind
@@ -8401,7 +9079,7 @@ return WorldService
 </Item>
 </Item>
 </Item>
-<Item class="StarterPlayer" referent="RBX00000043"><Properties><string name="Name">StarterPlayer</string></Properties><Item class="StarterPlayerScripts" referent="RBX00000042"><Properties><string name="Name">StarterPlayerScripts</string></Properties><Item class="Folder" referent="RBX00000041"><Properties><string name="Name">Client</string></Properties><Item class="Folder" referent="RBX0000002F"><Properties><string name="Name">Controllers</string></Properties><Item class="ModuleScript" referent="RBX00000025"><Properties><string name="Name">Ambience</string><ProtectedString name="Source"><![CDATA[-- Ambience.lua
+<Item class="StarterPlayer" referent="RBX00000045"><Properties><string name="Name">StarterPlayer</string></Properties><Item class="StarterPlayerScripts" referent="RBX00000044"><Properties><string name="Name">StarterPlayerScripts</string></Properties><Item class="Folder" referent="RBX00000043"><Properties><string name="Name">Client</string></Properties><Item class="Folder" referent="RBX00000031"><Properties><string name="Name">Controllers</string></Properties><Item class="ModuleScript" referent="RBX00000027"><Properties><string name="Name">Ambience</string><ProtectedString name="Source"><![CDATA[-- Ambience.lua
 -- Client-side environment animation and atmosphere:
 --   * smooth day/night cycle (server clock), night lamps, stars
 --   * weather: clouds, rain, storms with lightning + thunder, fog
@@ -8795,7 +9473,7 @@ end
 
 return Ambience
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000026"><Properties><string name="Name">Cinematic</string><ProtectedString name="Source"><![CDATA[-- Cinematic.lua
+<Item class="ModuleScript" referent="RBX00000028"><Properties><string name="Name">Cinematic</string><ProtectedString name="Source"><![CDATA[-- Cinematic.lua
 -- Cinematic intro flyover (letterbox, title card, depth of field) shown when
 -- you join, plus camera effects (sprint FOV, portal warp).
 
@@ -8929,7 +9607,7 @@ end
 
 return Cinematic
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000027"><Properties><string name="Name">Emotes</string><ProtectedString name="Source"><![CDATA[-- Emotes.lua
+<Item class="ModuleScript" referent="RBX00000029"><Properties><string name="Name">Emotes</string><ProtectedString name="Source"><![CDATA[-- Emotes.lua
 -- Procedural character animation layered on top of Roblox's default walk /
 -- run / jump animations, for every player on every client:
 --   carrying (arms overhead), stealing (crouch + reach), sprinting (lean),
@@ -9098,7 +9776,7 @@ end
 
 return Emotes
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000028"><Properties><string name="Name">Input</string><ProtectedString name="Source"><![CDATA[-- Input.lua
+<Item class="ModuleScript" referent="RBX0000002A"><Properties><string name="Name">Input</string><ProtectedString name="Source"><![CDATA[-- Input.lua
 -- Keyboard / gamepad bindings for abilities and menus. Touch players use the
 -- on-screen HUD buttons, which call the same actions.
 
@@ -9177,7 +9855,7 @@ end
 
 return Input
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000029"><Properties><string name="Name">Music</string><ProtectedString name="Source"><![CDATA[-- Music.lua
+<Item class="ModuleScript" referent="RBX0000002B"><Properties><string name="Name">Music</string><ProtectedString name="Source"><![CDATA[-- Music.lua
 -- Background music. If Config.Sounds.Music is set, that track loops.
 -- Otherwise a built-in procedural sequencer plays a cheerful soundtrack
 -- (melody + bass + arpeggio) using a single short note sample pitched with
@@ -9291,7 +9969,7 @@ end
 
 return Music
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX0000002A"><Properties><string name="Name">PetFollower</string><ProtectedString name="Source"><![CDATA[-- PetFollower.lua
+<Item class="ModuleScript" referent="RBX0000002C"><Properties><string name="Name">PetFollower</string><ProtectedString name="Source"><![CDATA[-- PetFollower.lua
 -- Renders and animates every player's equipped pets locally.
 -- Walkers trot with swinging legs and hop when their owner jumps; flyers bob
 -- in the air flapping their wings; idle pets breathe, wag tails and look at
@@ -9498,7 +10176,7 @@ end
 
 return PetFollower
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX0000002B"><Properties><string name="Name">Sound</string><ProtectedString name="Source"><![CDATA[-- Sound.lua
+<Item class="ModuleScript" referent="RBX0000002D"><Properties><string name="Name">Sound</string><ProtectedString name="Source"><![CDATA[-- Sound.lua
 -- Plays UI / gameplay sound effects locally and handles background music,
 -- respecting the player's settings.
 
@@ -9585,7 +10263,7 @@ end
 
 return Sound
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX0000002C"><Properties><string name="Name">State</string><ProtectedString name="Source"><![CDATA[-- State.lua
+<Item class="ModuleScript" referent="RBX0000002E"><Properties><string name="Name">State</string><ProtectedString name="Source"><![CDATA[-- State.lua
 -- Client mirror of the server state + a request helper.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9671,7 +10349,7 @@ end
 
 return State
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX0000002D"><Properties><string name="Name">TreasureAnimator</string><ProtectedString name="Source"><![CDATA[-- TreasureAnimator.lua
+<Item class="ModuleScript" referent="RBX0000002F"><Properties><string name="Name">TreasureAnimator</string><ProtectedString name="Source"><![CDATA[-- TreasureAnimator.lua
 -- Brings treasure "characters" to life, entirely on the client:
 --   * personality idles: Hop, Dance, Float, Spin, Wiggle, Bounce
 --   * roaming field treasures: walk / run / jump / dance on the shared
@@ -9784,6 +10462,12 @@ function TreasureAnimator.Track(model: Model)
 		Halo = model:FindFirstChild("Halo"),
 		Orbit = model:FindFirstChild("Orbit"),
 		Rainbow = model:GetAttribute("Rainbow"),
+		ParadeStart = model:GetAttribute("ParadeStart"),
+		ParadeFrom = model:GetAttribute("ParadeFrom"),
+		ParadeDir = model:GetAttribute("ParadeDir"),
+		ParadeSpeed = model:GetAttribute("ParadeSpeed"),
+		WalkFrom = model:GetAttribute("WalkFrom"),
+		ArriveAt = model:GetAttribute("ArriveAt"),
 		Lightning = model:GetAttribute("Lightning"),
 	}
 	-- spawn animation if it just appeared
@@ -9845,6 +10529,31 @@ local function animateOne(model: Model, info, t: number, now: number, camPos: Ve
 	local pos = home.Position
 	local state = "Idle"
 	local yaw = 0
+	-- Treasure Parade: walk along the carpet (same formula the server validates)
+	if info.ParadeStart and typeof(info.ParadeFrom) == "Vector3" then
+		local dir = info.ParadeDir
+		pos = info.ParadeFrom + dir * (info.ParadeSpeed * (now - info.ParadeStart))
+		yaw = math.atan2(dir.X, dir.Z)
+		local walk = CFrame.new(pos) * CFrame.Angles(0, yaw, 0)
+			* CFrame.new(0, math.abs(math.sin(t * 8 + info.Phase)) * 0.35, 0)
+			* CFrame.Angles(0, 0, math.sin(t * 8 + info.Phase) * 0.15)
+		info.Root.CFrame = walk
+		setExpression(info, "Happy")
+		return
+	end
+	-- just bought: walk from the parade to its stand
+	if typeof(info.WalkFrom) == "Vector3" and info.ArriveAt and now < info.ArriveAt then
+		local total = math.clamp((home.Position - info.WalkFrom).Magnitude / 14, 2, 14)
+		local f = math.clamp(1 - (info.ArriveAt - now) / total, 0, 1)
+		local p = info.WalkFrom:Lerp(home.Position, f)
+		local d = home.Position - info.WalkFrom
+		local y = math.atan2(d.X, d.Z)
+		info.Root.CFrame = CFrame.new(p) * CFrame.Angles(0, y, 0)
+			* CFrame.new(0, math.abs(math.sin(t * 10 + info.Phase)) * 0.5, 0)
+			* CFrame.Angles(0, 0, math.sin(t * 10 + info.Phase) * 0.2)
+		setExpression(info, "Excited")
+		return
+	end
 	if info.Seed then
 		local offset
 		offset, state, yaw = Motion.Sample(info.Seed, now, info.Radius)
@@ -9984,7 +10693,7 @@ end
 
 return TreasureAnimator
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX0000002E"><Properties><string name="Name">WorldFX</string><ProtectedString name="Source"><![CDATA[-- WorldFX.lua
+<Item class="ModuleScript" referent="RBX00000030"><Properties><string name="Name">WorldFX</string><ProtectedString name="Source"><![CDATA[-- WorldFX.lua
 -- Client-side world logic and polish:
 --   * treasure idle animation (spin + bob), rainbow / lightning flicker
 --   * performance mode (turns off particles, beams and lights locally)
@@ -10229,6 +10938,22 @@ local function onEffect(kind: string, a, b)
 	elseif kind == "Confetti" then
 		Notifications.Confetti()
 		Sound.Play("Legendary", 0.6)
+	elseif kind == "Grapple" and hrp and typeof(a) == "Vector3" then
+		local dir = a - hrp.Position
+		hrp.AssemblyLinearVelocity = dir.Unit * math.clamp(dir.Magnitude * 2.2, 60, 160) + Vector3.new(0, 18, 0)
+		local rope = Instance.new("Part")
+		rope.Anchored = true
+		rope.CanCollide = false
+		rope.CanQuery = false
+		rope.Material = Enum.Material.Neon
+		rope.Color = Color3.fromRGB(230, 230, 240)
+		rope.Size = Vector3.new(0.2, 0.2, dir.Magnitude)
+		rope.CFrame = CFrame.lookAt(hrp.Position + dir / 2, a)
+		rope.Parent = workspace
+		TweenService:Create(rope, TweenInfo.new(0.5), { Transparency = 1 }):Play()
+		game:GetService("Debris"):AddItem(rope, 0.6)
+		Sound.Play("Dash", 0.7, 1.3)
+		fovPunch(15, 0.6)
 	elseif kind == "GlobalShake" then
 		shake(a or 0.4, 1.2)
 	elseif kind == "ChestOpen" then
@@ -10355,6 +11080,34 @@ function WorldFX.Start()
 		Notifications.Toast(text, kind)
 	end)
 	State.StatsChanged.Event:Connect(updateGuide)
+	-- Grapple Hook: the tool asks the server to zip us to where we clicked
+	local function hookTool(tool: Instance)
+		if tool:IsA("Tool") and tool:GetAttribute("Grapple") and not tool:GetAttribute("Hooked") then
+			tool:SetAttribute("Hooked", true)
+			tool.Activated:Connect(function()
+				local mouse = player:GetMouse()
+				local target = mouse.Hit and mouse.Hit.Position
+				if target then
+					State.Request("Grapple", target)
+				end
+			end)
+		end
+	end
+	local function watchContainer(c: Instance?)
+		if not c then
+			return
+		end
+		for _, t in ipairs(c:GetChildren()) do
+			hookTool(t)
+		end
+		c.ChildAdded:Connect(hookTool)
+	end
+	watchContainer(player:FindFirstChildOfClass("Backpack"))
+	player.ChildAdded:Connect(function(c)
+		if c:IsA("Backpack") then
+			watchContainer(c)
+		end
+	end)
 	player.CharacterAdded:Connect(function()
 		guide.A0 = nil
 		if guide.Beam then
@@ -10367,7 +11120,7 @@ end
 return WorldFX
 ]]></ProtectedString></Properties></Item>
 </Item>
-<Item class="LocalScript" referent="RBX00000030"><Properties><string name="Name">Main</string><ProtectedString name="Source"><![CDATA[-- Main.client.lua
+<Item class="LocalScript" referent="RBX00000032"><Properties><string name="Name">Main</string><ProtectedString name="Source"><![CDATA[-- Main.client.lua
 -- Client bootstrap: builds the interface, starts controllers and applies
 -- player settings (UI scale for PC/mobile, sound, graphics).
 
@@ -10481,7 +11234,7 @@ task.delay(2, function()
 	Notifications.Toast("Grab treasures in the fields or buy them at the market, then bring them home!", "info")
 end)
 ]]></ProtectedString></Properties></Item>
-<Item class="Folder" referent="RBX00000040"><Properties><string name="Name">UI</string></Properties><Item class="ModuleScript" referent="RBX00000031"><Properties><string name="Name">AchievementsWindow</string><ProtectedString name="Source"><![CDATA[-- AchievementsWindow.lua
+<Item class="Folder" referent="RBX00000042"><Properties><string name="Name">UI</string></Properties><Item class="ModuleScript" referent="RBX00000033"><Properties><string name="Name">AchievementsWindow</string><ProtectedString name="Source"><![CDATA[-- AchievementsWindow.lua
 -- Achievement list with progress bars and gem rewards.
 
 local Lib = require(script.Parent.Lib)
@@ -10549,7 +11302,7 @@ end
 
 return Achievements
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000032"><Properties><string name="Name">GemShopWindow</string><ProtectedString name="Source"><![CDATA[-- GemShopWindow.lua
+<Item class="ModuleScript" referent="RBX00000034"><Properties><string name="Name">GemShopWindow</string><ProtectedString name="Source"><![CDATA[-- GemShopWindow.lua
 -- Gem shop (boosts, Auto Collector, pet slots), active boost timers and base
 -- personalisation (12 colours).
 
@@ -10657,7 +11410,7 @@ end
 
 return GemShop
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000033"><Properties><string name="Name">HUD</string><ProtectedString name="Source"><![CDATA[-- HUD.lua
+<Item class="ModuleScript" referent="RBX00000035"><Properties><string name="Name">HUD</string><ProtectedString name="Source"><![CDATA[-- HUD.lua
 -- Always-on interface: money counter, income, level bar, menu buttons,
 -- carrying status, base lock button, cooldown chips, ability buttons (also
 -- the mobile controls), world event timer and incoming trade requests.
@@ -11137,7 +11890,7 @@ end
 
 return HUD
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000034"><Properties><string name="Name">IndexWindow</string><ProtectedString name="Source"><![CDATA[-- IndexWindow.lua
+<Item class="ModuleScript" referent="RBX00000036"><Properties><string name="Name">IndexWindow</string><ProtectedString name="Source"><![CDATA[-- IndexWindow.lua
 -- The Treasure Index: every treasure in the game, discovered or not,
 -- filterable by rarity, with completion progress and 3D previews.
 
@@ -11294,7 +12047,7 @@ end
 
 return Index
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000035"><Properties><string name="Name">InventoryWindow</string><ProtectedString name="Source"><![CDATA[-- InventoryWindow.lua
+<Item class="ModuleScript" referent="RBX00000037"><Properties><string name="Name">InventoryWindow</string><ProtectedString name="Source"><![CDATA[-- InventoryWindow.lua
 -- Your treasures: placed on platforms or in storage. Place, store and sell,
 -- with a rotating 3D preview of the selected treasure.
 
@@ -11306,6 +12059,7 @@ local TreasureData = require(Shared.TreasureData)
 local Rarities = require(Shared.Rarities)
 local Config = require(Shared.Config)
 local Util = require(Shared.Util)
+local Mutations = require(Shared.Mutations)
 
 local T = Lib.Theme
 local new = Lib.new
@@ -11323,6 +12077,7 @@ local isOpen = false
 
 function Inventory.Card(def, opts)
 	local color = Rarities.Color(def.Rarity)
+	local mut = opts.Mut and Mutations.Info[opts.Mut]
 	local card = new("TextButton", {
 		Name = def.Id,
 		BackgroundColor3 = color,
@@ -11332,8 +12087,12 @@ function Inventory.Card(def, opts)
 	}, {
 		Lib.corner(12),
 		Lib.gradient(Color3.new(1, 1, 1), Color3.fromRGB(110, 110, 130), 90),
-		Lib.stroke(opts.Selected and T.Accent or color:Lerp(Color3.new(0, 0, 0), 0.4), opts.Selected and 4 or 2),
+		Lib.stroke(opts.Selected and T.Accent or (mut and mut.Color or color:Lerp(Color3.new(0, 0, 0), 0.4)), (opts.Selected or mut) and 4 or 2),
 	})
+	if mut then
+		local tag = Lib.label({ Size = UDim2.fromOffset(26, 26), Position = UDim2.new(1, -28, 0, 2), Text = mut.Icon, MaxText = 20, Parent = card })
+		tag.ZIndex = 3
+	end
 	local icon = Lib.label({
 		Size = UDim2.new(1, 0, 0.5, 0),
 		Position = UDim2.fromScale(0, 0.04),
@@ -11355,7 +12114,7 @@ function Inventory.Card(def, opts)
 	local sub = Lib.label({
 		Size = UDim2.new(1, -8, 0.18, 0),
 		Position = UDim2.new(0, 4, 0.78, 0),
-		Text = opts.Sub or (Util.Money(def.MPS) .. "/s"),
+		Text = opts.Sub or (Util.Money(def.MPS * Mutations.Multiplier(opts.Mut)) .. "/s"),
 		TextColor3 = Color3.fromRGB(190, 255, 190),
 		MaxText = 13,
 		Parent = card,
@@ -11426,13 +12185,14 @@ local function refreshDetail()
 	local def = TreasureData.Get(t.Id)
 	cleanupPreview = Preview.Show(detail.Viewport, def)
 	detail.Name.Text = def.Name
-	detail.Rarity.Text = def.Rarity:upper() .. (def.Exclusive and " • EXCLUSIVE" or "")
+	detail.Rarity.Text = def.Rarity:upper() .. (def.Exclusive and " • EXCLUSIVE" or "") .. (t.Mut and ("  " .. Mutations.Label(t.Mut)) or "")
 	detail.Rarity.TextColor3 = Rarities.Color(def.Rarity)
 	local status = t.Stealing and "🚨 BEING STOLEN!" or (t.InTrade and "🤝 In trade" or (t.Plot and ("📍 Platform " .. t.Plot) or "📦 In storage"))
+	local m = Mutations.Multiplier(t.Mut)
 	detail.Info.Text = ("💰 %s/s\n💎 Value %s\n🏷️ Sells for %s\n%s"):format(
-		Util.Money(def.MPS),
-		Util.Money(def.Value),
-		Util.Money(math.floor(def.Value * Config.SellMultiplier)),
+		Util.Money(def.MPS * m),
+		Util.Money(def.Value * m),
+		Util.Money(math.floor(def.Value * m * Config.SellMultiplier)),
 		status
 	)
 	detail.Place.Visible = t.Plot == nil and not t.InTrade
@@ -11460,7 +12220,7 @@ local function refresh()
 	countLabel.Text = ("📍 %d/%d platforms   📦 %d/%d storage"):format(placed, full.PlotCount, stored, full.MaxStorage)
 	for i, e in ipairs(entries()) do
 		local badge = e.Entry.Stealing and "🚨" or (e.Entry.Plot and "📍" or nil)
-		local card = Inventory.Card(e.Def, { Order = i, Selected = e.Entry.Uid == selectedUid, Badge = badge })
+		local card = Inventory.Card(e.Def, { Order = i, Selected = e.Entry.Uid == selectedUid, Badge = badge, Mut = e.Entry.Mut })
 		card.Activated:Connect(function()
 			selectedUid = e.Entry.Uid
 			refresh()
@@ -11600,7 +12360,7 @@ end
 
 return Inventory
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000036"><Properties><string name="Name">LeaderboardWindow</string><ProtectedString name="Source"><![CDATA[-- LeaderboardWindow.lua
+<Item class="ModuleScript" referent="RBX00000038"><Properties><string name="Name">LeaderboardWindow</string><ProtectedString name="Source"><![CDATA[-- LeaderboardWindow.lua
 -- Server board (live) and global boards (Richest, Rebirths).
 
 local Players = game:GetService("Players")
@@ -11708,7 +12468,7 @@ end
 
 return Board
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000037"><Properties><string name="Name">Lib</string><ProtectedString name="Source"><![CDATA[-- Lib.lua
+<Item class="ModuleScript" referent="RBX00000039"><Properties><string name="Name">Lib</string><ProtectedString name="Source"><![CDATA[-- Lib.lua
 -- Tiny declarative UI helper + theme used by every window.
 
 local TweenService = game:GetService("TweenService")
@@ -11951,7 +12711,7 @@ end
 
 return Lib
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000038"><Properties><string name="Name">Notifications</string><ProtectedString name="Source"><![CDATA[-- Notifications.lua
+<Item class="ModuleScript" referent="RBX0000003A"><Properties><string name="Name">Notifications</string><ProtectedString name="Source"><![CDATA[-- Notifications.lua
 -- Toasts, big announcement banners, the robbery alarm overlay, level-up /
 -- rebirth splashes and confetti.
 
@@ -12279,7 +13039,7 @@ end
 
 return Notifications
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX00000039"><Properties><string name="Name">PetsWindow</string><ProtectedString name="Source"><![CDATA[-- PetsWindow.lua
+<Item class="ModuleScript" referent="RBX0000003B"><Properties><string name="Name">PetsWindow</string><ProtectedString name="Source"><![CDATA[-- PetsWindow.lua
 -- Pet inventory (equip / unequip / release / equip best, 3D preview) and the
 -- egg shop with odds and an animated hatching sequence.
 
@@ -12644,7 +13404,7 @@ end
 
 return Pets
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX0000003A"><Properties><string name="Name">Preview</string><ProtectedString name="Source"><![CDATA[-- Preview.lua
+<Item class="ModuleScript" referent="RBX0000003C"><Properties><string name="Name">Preview</string><ProtectedString name="Source"><![CDATA[-- Preview.lua
 -- Rotating 3D treasure preview inside a ViewportFrame (built from the same
 -- procedural model the world uses).
 
@@ -12730,7 +13490,7 @@ end
 
 return Preview
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX0000003B"><Properties><string name="Name">RebirthWindow</string><ProtectedString name="Source"><![CDATA[-- RebirthWindow.lua
+<Item class="ModuleScript" referent="RBX0000003D"><Properties><string name="Name">RebirthWindow</string><ProtectedString name="Source"><![CDATA[-- RebirthWindow.lua
 -- Rebirth progress, permanent bonuses, milestone rewards and title picker.
 
 local Lib = require(script.Parent.Lib)
@@ -12763,6 +13523,10 @@ local function refresh()
 	info.Text = ("You have rebirthed %d times.\nCurrent income multiplier: x%.2f\n\nRebirth %d gives: +%d%% total income, +%d walk speed and %s starting cash.\nYou keep: abilities, index, secrets, titles & exclusive treasures.\nYou lose: money, treasures and upgrades.")
 		:format(full.Rebirths, full.Multiplier, nextR, bonus, Config.Rebirth.SpeedBonusPerRebirth, Util.Money(Config.StartingMoney + nextR * Config.Rebirth.StartingMoneyPerRebirth))
 	setProgress(full.Money / cost, ("%s / %s"):format(Util.Money(full.Money), Util.Money(cost)))
+	local req = full.RebirthReq
+	if req then
+		info.Text ..= ("\n\n📌 Also requires: %d × %s+ treasure%s"):format(req.Count, req.Rarity, req.Count > 1 and "s" or "")
+	end
 	local canAfford = full.Money >= cost
 	if os.clock() < confirmUntil then
 		rebirthButton.Text = "⚠️ TAP AGAIN TO CONFIRM"
@@ -12877,7 +13641,7 @@ end
 
 return Rebirth
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX0000003C"><Properties><string name="Name">SettingsWindow</string><ProtectedString name="Source"><![CDATA[-- SettingsWindow.lua
+<Item class="ModuleScript" referent="RBX0000003E"><Properties><string name="Name">SettingsWindow</string><ProtectedString name="Source"><![CDATA[-- SettingsWindow.lua
 -- Music, sound effects, graphics quality, treasure effects and UI scale.
 -- Settings are saved on the server with the rest of your progress.
 
@@ -12994,7 +13758,7 @@ function Settings.Build(content: Frame)
 		local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 84), LayoutOrder = 31, Parent = scroll }, {
 			new("UIGridLayout", { CellSize = UDim2.fromOffset(120, 36), CellPadding = UDim2.fromOffset(6, 6), HorizontalAlignment = Enum.HorizontalAlignment.Center }),
 		})
-		for _, name in ipairs({ "DoubleMoney", "Meteor", "GoldenRain", "Lucky", "Secret", "Apocalypse", "Divine" }) do
+		for _, name in ipairs({ "DoubleMoney", "Meteor", "GoldenRain", "Lucky", "Secret", "Apocalypse", "Divine", "Lava", "Rainbow" }) do
 			Lib.button({ Text = name, Color = T.Purple, MaxText = 14, Parent = row, OnClick = function()
 				State.Request("DebugEvent", name)
 			end })
@@ -13009,7 +13773,7 @@ end
 
 return Settings
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX0000003D"><Properties><string name="Name">ShopWindow</string><ProtectedString name="Source"><![CDATA[-- ShopWindow.lua
+<Item class="ModuleScript" referent="RBX0000003F"><Properties><string name="Name">ShopWindow</string><ProtectedString name="Source"><![CDATA[-- ShopWindow.lua
 -- Upgrades (speed, carry capacity, base expansion, protection, income) and
 -- special abilities.
 
@@ -13057,7 +13821,8 @@ local function refresh()
 		return
 	end
 	local full = State.Full
-	for key, r in pairs(rows) do
+	for rowKey, r in pairs(rows) do
+		local key = r.Key or rowKey
 		if r.Kind == "Upgrade" then
 			local up = UpgradeData.Upgrades[key]
 			local level = full.Upgrades[key] or 0
@@ -13069,6 +13834,27 @@ local function refresh()
 				local cost = up.Cost(level)
 				r.UI.Button.Text = Util.Money(cost)
 				Lib.setButtonColor(r.UI.Button, full.Money >= cost and T.Green or T.Red)
+			end
+		elseif r.Kind == "Gear" then
+			local item = UpgradeData.Gear[key]
+			local gear = full.Gear or {}
+			if key == "Bat" then
+				local lvl = gear.Bat or 0
+				local cost = item.Costs[lvl + 1]
+				r.UI.Title.Text = ("%s  (%s)"):format(item.Name, UpgradeData.BatStats(lvl).Name)
+				if cost then
+					r.UI.Button.Text = Util.Money(cost)
+					Lib.setButtonColor(r.UI.Button, full.Money >= cost and T.Green or T.Red)
+				else
+					r.UI.Button.Text = "MAXED"
+					Lib.setButtonColor(r.UI.Button, T.Panel2)
+				end
+			elseif gear[key] then
+				r.UI.Button.Text = "OWNED"
+				Lib.setButtonColor(r.UI.Button, T.Panel2)
+			else
+				r.UI.Button.Text = Util.Money(item.Cost)
+				Lib.setButtonColor(r.UI.Button, full.Money >= item.Cost and T.Green or T.Red)
 			end
 		else
 			local ab = UpgradeData.Abilities[key]
@@ -13111,6 +13897,16 @@ function Shop.Build(content: Frame)
 		end)
 		rows[key] = { Kind = "Ability", UI = ui }
 	end
+	local header3 = Lib.label({ Size = UDim2.new(1, 0, 0, 30), Text = "🧰 GEAR", Font = T.Title, TextColor3 = T.Orange, LayoutOrder = 100, MaxText = 24, Parent = scroll })
+	Lib.textStroke(2).Parent = header3
+	for i, key in ipairs(UpgradeData.SortedKeys(UpgradeData.Gear)) do
+		local item = UpgradeData.Gear[key]
+		local ui = makeRow(scroll, 100 + i, item.Icon, item.Name, item.Description, T.Orange)
+		ui.Button.Activated:Connect(function()
+			State.Request("BuyGear", key)
+		end)
+		rows["Gear_" .. key] = { Kind = "Gear", Key = key, UI = ui }
+	end
 	State.FullChanged.Event:Connect(refresh)
 	State.StatsChanged.Event:Connect(refresh)
 end
@@ -13126,7 +13922,7 @@ end
 
 return Shop
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX0000003E"><Properties><string name="Name">TradeWindow</string><ProtectedString name="Source"><![CDATA[-- TradeWindow.lua
+<Item class="ModuleScript" referent="RBX00000040"><Properties><string name="Name">TradeWindow</string><ProtectedString name="Source"><![CDATA[-- TradeWindow.lua
 -- Trading UI: pick a player, then build offers (treasures + money), mark
 -- ready and watch the confirm countdown. Everything is validated server side.
 
@@ -13474,7 +14270,7 @@ end
 
 return Trade
 ]]></ProtectedString></Properties></Item>
-<Item class="ModuleScript" referent="RBX0000003F"><Properties><string name="Name">Windows</string><ProtectedString name="Source"><![CDATA[-- Windows.lua
+<Item class="ModuleScript" referent="RBX00000041"><Properties><string name="Name">Windows</string><ProtectedString name="Source"><![CDATA[-- Windows.lua
 -- Window manager: one menu open at a time, animated open/close, shared
 -- title bar and close button. Each window module implements:
 --   Build(content: Frame, api)  -- called once
@@ -13662,6 +14458,6 @@ return Windows
 </Item>
 </Item>
 </Item>
-<Item class="Workspace" referent="RBX00000044"><Properties><string name="Name">Workspace</string><bool name="StreamingEnabled">false</bool></Properties></Item>
-<Item class="Lighting" referent="RBX00000045"><Properties><string name="Name">Lighting</string><token name="Technology">4</token><bool name="GlobalShadows">true</bool><float name="EnvironmentDiffuseScale">0.8</float><float name="EnvironmentSpecularScale">1</float></Properties></Item>
+<Item class="Workspace" referent="RBX00000046"><Properties><string name="Name">Workspace</string><bool name="StreamingEnabled">false</bool></Properties></Item>
+<Item class="Lighting" referent="RBX00000047"><Properties><string name="Name">Lighting</string><token name="Technology">4</token><bool name="GlobalShadows">true</bool><float name="EnvironmentDiffuseScale">0.8</float><float name="EnvironmentSpecularScale">1</float></Properties></Item>
 </roblox>

@@ -79,8 +79,22 @@ Config.Spawns = {
 	PickupDistance = 12,
 }
 
+-- Layout: bases line both sides of the Treasure Parade; the plaza sits at
+-- the parade's start.
+Config.PlazaCenter = Vector3.new(-340, 0, 0)
+Config.BaseRowZ = 80 -- base centres at z = +/-80, facing the parade
+Config.BaseColumnsX = { -168, -56, 56, 168 }
+Config.Parade = {
+	StartX = -248,
+	EndX = 248,
+	Z = 0,
+	Width = 14,
+	Speed = 7, -- studs per second
+	Interval = 2.6, -- seconds between treasures
+}
+
 Config.Market = {
-	Stalls = 10,
+	Stalls = 0, -- the walking Treasure Parade replaced the old stalls
 	RestockSeconds = 45,
 	PriceMultiplier = 1.0,
 }
@@ -171,6 +185,23 @@ Config.Rebirth = {
 	MaxSpeedBonus = 10,
 	StartingMoneyPerRebirth = 1000,
 }
+-- Each rebirth also requires owning certain treasures (kept until you rebirth).
+local REQ = {
+	{ Rarity = "Epic", Count = 1 },
+	{ Rarity = "Legendary", Count = 1 },
+	{ Rarity = "Legendary", Count = 2 },
+	{ Rarity = "Mythical", Count = 1 },
+	{ Rarity = "Mythical", Count = 2 },
+	{ Rarity = "Secret", Count = 1 },
+	{ Rarity = "Secret", Count = 2 },
+	{ Rarity = "Divine", Count = 1 },
+	{ Rarity = "Divine", Count = 2 },
+	{ Rarity = "Celestial", Count = 1 },
+}
+function Config.RebirthRequirement(rebirths: number)
+	return REQ[math.min(rebirths + 1, #REQ)]
+end
+
 function Config.RebirthCost(rebirths: number): number
 	return math.floor(Config.Rebirth.BaseCost * Config.Rebirth.CostGrowth ^ rebirths)
 end

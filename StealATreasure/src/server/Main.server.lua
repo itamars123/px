@@ -15,6 +15,7 @@ local ORDER = {
 	"TreasureService",
 	"StealService",
 	"PlayerService",
+	"GearService",
 	"PetService",
 	"AchievementService",
 	"WorldService",

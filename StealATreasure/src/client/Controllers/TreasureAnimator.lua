@@ -111,6 +111,12 @@ function TreasureAnimator.Track(model: Model)
 		Halo = model:FindFirstChild("Halo"),
 		Orbit = model:FindFirstChild("Orbit"),
 		Rainbow = model:GetAttribute("Rainbow"),
+		ParadeStart = model:GetAttribute("ParadeStart"),
+		ParadeFrom = model:GetAttribute("ParadeFrom"),
+		ParadeDir = model:GetAttribute("ParadeDir"),
+		ParadeSpeed = model:GetAttribute("ParadeSpeed"),
+		WalkFrom = model:GetAttribute("WalkFrom"),
+		ArriveAt = model:GetAttribute("ArriveAt"),
 		Lightning = model:GetAttribute("Lightning"),
 	}
 	-- spawn animation if it just appeared
@@ -172,6 +178,31 @@ local function animateOne(model: Model, info, t: number, now: number, camPos: Ve
 	local pos = home.Position
 	local state = "Idle"
 	local yaw = 0
+	-- Treasure Parade: walk along the carpet (same formula the server validates)
+	if info.ParadeStart and typeof(info.ParadeFrom) == "Vector3" then
+		local dir = info.ParadeDir
+		pos = info.ParadeFrom + dir * (info.ParadeSpeed * (now - info.ParadeStart))
+		yaw = math.atan2(dir.X, dir.Z)
+		local walk = CFrame.new(pos) * CFrame.Angles(0, yaw, 0)
+			* CFrame.new(0, math.abs(math.sin(t * 8 + info.Phase)) * 0.35, 0)
+			* CFrame.Angles(0, 0, math.sin(t * 8 + info.Phase) * 0.15)
+		info.Root.CFrame = walk
+		setExpression(info, "Happy")
+		return
+	end
+	-- just bought: walk from the parade to its stand
+	if typeof(info.WalkFrom) == "Vector3" and info.ArriveAt and now < info.ArriveAt then
+		local total = math.clamp((home.Position - info.WalkFrom).Magnitude / 14, 2, 14)
+		local f = math.clamp(1 - (info.ArriveAt - now) / total, 0, 1)
+		local p = info.WalkFrom:Lerp(home.Position, f)
+		local d = home.Position - info.WalkFrom
+		local y = math.atan2(d.X, d.Z)
+		info.Root.CFrame = CFrame.new(p) * CFrame.Angles(0, y, 0)
+			* CFrame.new(0, math.abs(math.sin(t * 10 + info.Phase)) * 0.5, 0)
+			* CFrame.Angles(0, 0, math.sin(t * 10 + info.Phase) * 0.2)
+		setExpression(info, "Excited")
+		return
+	end
 	if info.Seed then
 		local offset
 		offset, state, yaw = Motion.Sample(info.Seed, now, info.Radius)

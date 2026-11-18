@@ -46,7 +46,8 @@ local function refresh()
 		return
 	end
 	local full = State.Full
-	for key, r in pairs(rows) do
+	for rowKey, r in pairs(rows) do
+		local key = r.Key or rowKey
 		if r.Kind == "Upgrade" then
 			local up = UpgradeData.Upgrades[key]
 			local level = full.Upgrades[key] or 0
@@ -58,6 +59,27 @@ local function refresh()
 				local cost = up.Cost(level)
 				r.UI.Button.Text = Util.Money(cost)
 				Lib.setButtonColor(r.UI.Button, full.Money >= cost and T.Green or T.Red)
+			end
+		elseif r.Kind == "Gear" then
+			local item = UpgradeData.Gear[key]
+			local gear = full.Gear or {}
+			if key == "Bat" then
+				local lvl = gear.Bat or 0
+				local cost = item.Costs[lvl + 1]
+				r.UI.Title.Text = ("%s  (%s)"):format(item.Name, UpgradeData.BatStats(lvl).Name)
+				if cost then
+					r.UI.Button.Text = Util.Money(cost)
+					Lib.setButtonColor(r.UI.Button, full.Money >= cost and T.Green or T.Red)
+				else
+					r.UI.Button.Text = "MAXED"
+					Lib.setButtonColor(r.UI.Button, T.Panel2)
+				end
+			elseif gear[key] then
+				r.UI.Button.Text = "OWNED"
+				Lib.setButtonColor(r.UI.Button, T.Panel2)
+			else
+				r.UI.Button.Text = Util.Money(item.Cost)
+				Lib.setButtonColor(r.UI.Button, full.Money >= item.Cost and T.Green or T.Red)
 			end
 		else
 			local ab = UpgradeData.Abilities[key]
@@ -99,6 +121,16 @@ function Shop.Build(content: Frame)
 			end
 		end)
 		rows[key] = { Kind = "Ability", UI = ui }
+	end
+	local header3 = Lib.label({ Size = UDim2.new(1, 0, 0, 30), Text = "🧰 GEAR", Font = T.Title, TextColor3 = T.Orange, LayoutOrder = 100, MaxText = 24, Parent = scroll })
+	Lib.textStroke(2).Parent = header3
+	for i, key in ipairs(UpgradeData.SortedKeys(UpgradeData.Gear)) do
+		local item = UpgradeData.Gear[key]
+		local ui = makeRow(scroll, 100 + i, item.Icon, item.Name, item.Description, T.Orange)
+		ui.Button.Activated:Connect(function()
+			State.Request("BuyGear", key)
+		end)
+		rows["Gear_" .. key] = { Kind = "Gear", Key = key, UI = ui }
 	end
 	State.FullChanged.Event:Connect(refresh)
 	State.StatsChanged.Event:Connect(refresh)

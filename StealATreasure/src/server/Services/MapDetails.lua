@@ -6,6 +6,10 @@
 
 local CollectionService = game:GetService("CollectionService")
 
+local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
+local Config = require(Shared.Config)
+local PLAZA = Config.PlazaCenter
+
 local MapDetails = {}
 
 local function tag(inst: Instance, name: string, attrs: { [string]: any }?)
@@ -90,8 +94,8 @@ end
 -- Buildings ------------------------------------------------------------------------
 local function shopBuilding(root, M, angleDeg: number, name: string, label: string, color: Color3, ui: string, action: string)
 	local a = math.rad(angleDeg)
-	local pos = Vector3.new(math.cos(a) * 64, 1.2, math.sin(a) * 64)
-	local cf = CFrame.lookAt(pos, Vector3.new(0, 1.2, 0))
+	local pos = PLAZA + Vector3.new(math.cos(a) * 64, 1.2, math.sin(a) * 64)
+	local cf = CFrame.lookAt(pos, PLAZA + Vector3.new(0, 1.2, 0))
 	local m = Instance.new("Model")
 	m.Name = name
 	local white = Color3.fromRGB(250, 248, 240)
@@ -216,10 +220,10 @@ local function buildPortals(root, map, M)
 	local portals = folder("Portals", root)
 	local function plazaCF(angleDeg)
 		local a = math.rad(angleDeg)
-		local pos = Vector3.new(math.cos(a) * 96, 0, math.sin(a) * 96)
-		return CFrame.lookAt(pos, Vector3.new(0, 0, 0)), pos
+		local pos = PLAZA + Vector3.new(math.cos(a) * 96, 0, math.sin(a) * 96)
+		return CFrame.lookAt(pos, PLAZA), pos
 	end
-	local home = Vector3.new(0, 4, 30)
+	local home = PLAZA + Vector3.new(0, 4, 30)
 	local sky = Vector3.new(330, 156, 330)
 	local crater = map.Crater.Center + (-map.Crater.Center).Unit * 50 + Vector3.new(0, 4, 0)
 	local shrine = Vector3.new(380, 0, -320) + (-Vector3.new(380, 0, -320)).Unit * 42 + Vector3.new(0, 4, 0)
@@ -259,7 +263,7 @@ local function pine(parent, M, pos: Vector3, scale: number)
 end
 
 local FORESTS = {
-	{ Name = "Whispering Woods", Center = Vector3.new(-470, 0, -40), R = 80 },
+	{ Name = "Whispering Woods", Center = Vector3.new(-520, 0, -200), R = 75 },
 	{ Name = "Pinecrest Forest", Center = Vector3.new(100, 0, 480), R = 70 },
 	{ Name = "Shadow Grove", Center = Vector3.new(-200, 0, -450), R = 65 },
 }
@@ -308,7 +312,7 @@ local function decorate(root, map, M)
 	local plaza = root:FindFirstChild("Marketplace")
 	for i = 0, 11 do
 		local a = i / 12 * math.pi * 2 + 0.13
-		local pos = Vector3.new(math.cos(a) * 74, 0, math.sin(a) * 74)
+		local pos = PLAZA + Vector3.new(math.cos(a) * 74, 0, math.sin(a) * 74)
 		M.Part(plaza, Vector3.new(0.5, 16, 0.5), CFrame.new(pos + Vector3.new(0, 8, 0)), Color3.fromRGB(240, 240, 240), Enum.Material.Metal)
 		local flag = M.Part(plaza, Vector3.new(0.15, 3, 5), CFrame.new(pos + Vector3.new(0, 14.5, 2.6)), Color3.fromHSV(i / 12, 0.7, 1), Enum.Material.Fabric, { CanCollide = false })
 		tag(flag, "Flag", { SwayAmount = 0.25 })

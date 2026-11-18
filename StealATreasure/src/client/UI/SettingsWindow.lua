@@ -115,7 +115,7 @@ function Settings.Build(content: Frame)
 		local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 84), LayoutOrder = 31, Parent = scroll }, {
 			new("UIGridLayout", { CellSize = UDim2.fromOffset(120, 36), CellPadding = UDim2.fromOffset(6, 6), HorizontalAlignment = Enum.HorizontalAlignment.Center }),
 		})
-		for _, name in ipairs({ "DoubleMoney", "Meteor", "GoldenRain", "Lucky", "Secret", "Apocalypse", "Divine" }) do
+		for _, name in ipairs({ "DoubleMoney", "Meteor", "GoldenRain", "Lucky", "Secret", "Apocalypse", "Divine", "Lava", "Rainbow" }) do
 			Lib.button({ Text = name, Color = T.Purple, MaxText = 14, Parent = row, OnClick = function()
 				State.Request("DebugEvent", name)
 			end })
