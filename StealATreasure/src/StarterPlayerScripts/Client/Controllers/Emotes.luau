@@ -8,6 +8,7 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local FrameLoop = require(script.Parent.FrameLoop)
 
 local State = require(script.Parent.State)
 
@@ -151,7 +152,7 @@ local function animateCharacter(char: Model, t: number)
 end
 
 function Emotes.Start()
-	RunService.RenderStepped:Connect(function()
+	FrameLoop.Bind("Emotes", function()
 		local t = os.clock()
 		local cam = workspace.CurrentCamera
 		local camPos = cam and cam.CFrame.Position or Vector3.zero

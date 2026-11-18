@@ -121,16 +121,18 @@ local function setupLighting()
 	atmo.Glare = 0.2
 	atmo.Haze = 1.2
 	local cc = ensure("ColorCorrectionEffect", "GameColor") :: ColorCorrectionEffect
-	cc.Saturation = 0.18
-	cc.Contrast = 0.06
+	cc.Saturation = 0.2
+	cc.Contrast = 0.1
 	cc.Brightness = 0.02
 	local bloom = ensure("BloomEffect", "GameBloom") :: BloomEffect
-	bloom.Intensity = 0.6
-	bloom.Size = 30
-	bloom.Threshold = 1.6
+	bloom.Intensity = 0.8
+	bloom.Size = 24
+	bloom.Threshold = 1.3
 	local rays = ensure("SunRaysEffect", "GameSunRays") :: SunRaysEffect
-	rays.Intensity = 0.06
+	rays.Intensity = 0.12
 	rays.Spread = 0.8
+	Lighting.ShadowSoftness = 0.25
+	Lighting.ExposureCompensation = 0.15
 	ensure("Sky", "GameSky")
 end
 

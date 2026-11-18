@@ -46,12 +46,13 @@ local function pushScores()
 		local data = S.DataService.Get(player)
 		if data then
 			local key = tostring(player.UserId)
-			pcall(function()
+			local ok, err = pcall(function()
 				stores.Richest:SetAsync(key, math.floor(math.min(data.Money, MAX_SAFE)))
-			end)
-			pcall(function()
 				stores.Rebirths:SetAsync(key, data.Rebirths)
 			end)
+			if not ok then
+				warn(("[Leaderboard] could not save %s: %s"):format(player.Name, tostring(err)))
+			end
 		end
 	end
 end

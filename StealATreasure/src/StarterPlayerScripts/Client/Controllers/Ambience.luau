@@ -10,6 +10,7 @@ local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local FrameLoop = require(script.Parent.FrameLoop)
 
 local State = require(script.Parent.State)
 local Sound = require(script.Parent.Sound)
@@ -365,7 +366,7 @@ function Ambience.Start()
 	rainEmitter.Parent = rainPart
 
 	local pulseAcc = 0
-	RunService.RenderStepped:Connect(function(dt)
+	FrameLoop.Bind("Ambience", function(dt)
 		local t = os.clock()
 		local cam = workspace.CurrentCamera
 		local camPos = cam and cam.CFrame.Position or Vector3.zero

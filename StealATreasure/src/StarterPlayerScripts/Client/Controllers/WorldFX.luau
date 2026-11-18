@@ -13,6 +13,7 @@ local RunService = game:GetService("RunService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
+local FrameLoop = require(script.Parent.FrameLoop)
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Remotes = require(Shared.Remotes)
@@ -188,6 +189,39 @@ local function shake(amount: number, duration: number)
 	shakeUntil = os.clock() + duration
 end
 
+-- One-shot particle burst at a position (skill animation-vfx "sparkles"
+-- recipe, Emit() instead of a running emitter so it costs nothing after).
+local function burst(pos: Vector3, color: Color3, count: number, speed: number?)
+	if WorldFX.LowGfx then
+		count = math.floor(count / 3)
+	end
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.Transparency = 1
+	p.Size = Vector3.new(1, 1, 1)
+	p.CFrame = CFrame.new(pos)
+	local e = Instance.new("ParticleEmitter")
+	e.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	e.Color = ColorSequence.new(color, Color3.new(1, 1, 1))
+	e.LightEmission = 1
+	e.Rate = 0
+	e.Speed = NumberRange.new((speed or 14) * 0.5, speed or 14)
+	e.SpreadAngle = Vector2.new(180, 180)
+	e.Acceleration = Vector3.new(0, -18, 0)
+	e.Lifetime = NumberRange.new(0.6, 1.1)
+	e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.6), NumberSequenceKeypoint.new(1, 0) })
+	e.Rotation = NumberRange.new(0, 360)
+	e.RotSpeed = NumberRange.new(-180, 180)
+	e.Parent = p
+	p.Parent = workspace
+	e:Emit(count)
+	game:GetService("Debris"):AddItem(p, 1.5)
+end
+WorldFX.Burst = burst
+
 local function onEffect(kind: string, a, b)
 	local char = player.Character
 	local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -227,11 +261,18 @@ local function onEffect(kind: string, a, b)
 			fovPunch(8, 0.6)
 		end
 	elseif kind == "Deposit" then
+		if hrp then
+			local Rar = Rarities.Info[a or "Common"]
+			burst(hrp.Position + Vector3.new(0, 3, 0), Rar and Rar.Color or Color3.new(1, 1, 1), 20 + Rarities.Rank(a or "Common") * 8, 16)
+		end
 		Sound.Play("Deposit", 0.7)
 		if Rarities.Rank(a or "Common") >= 5 then
 			Notifications.Confetti()
 		end
 	elseif kind == "Sell" or kind == "Purchase" then
+		if hrp then
+			burst(hrp.Position + Vector3.new(0, 2, 0), kind == "Sell" and Color3.fromRGB(120, 255, 140) or Color3.fromRGB(120, 200, 255), 30, 12)
+		end
 		Sound.Play("Purchase", 0.6)
 	elseif kind == "LevelUp" then
 		Sound.Play("LevelUp", 0.7)
@@ -267,6 +308,9 @@ local function onEffect(kind: string, a, b)
 		Sound.Play("Collect", 0.5, 1.4)
 		Notifications.MoneyPop("+" .. Util.Money(a or 0), Color3.fromRGB(255, 220, 80))
 	elseif kind == "Collect" then
+		if hrp then
+			burst(hrp.Position + Vector3.new(0, 1, 0), Color3.fromRGB(255, 215, 60), 45, 18)
+		end
 		Sound.Play("Collect", 0.8)
 		Notifications.MoneyPop("💰 +" .. Util.Money(a or 0), Color3.fromRGB(120, 255, 120))
 		fovPunch(6, 0.4)
@@ -365,7 +409,7 @@ function WorldFX.Start()
 		end
 	end)
 
-	RunService.RenderStepped:Connect(function()
+	FrameLoop.Bind("CameraShake", function()
 		if os.clock() < shakeUntil then
 			local cam = workspace.CurrentCamera
 			local s = shakeAmount

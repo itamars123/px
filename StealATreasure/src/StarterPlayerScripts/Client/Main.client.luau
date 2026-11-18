@@ -88,8 +88,21 @@ Music.Start()
 Cinematic.Start()
 Input.Init(Windows, HUD)
 
+-- Skill animation-vfx "Disable effects on low-end devices": if the Roblox
+-- graphics level is low, run in Performance Mode even if it's switched off.
+local lowEndDevice = false
+pcall(function()
+	local q = UserSettings().GameSettings.SavedQualityLevel
+	if q ~= Enum.SavedQualitySetting.Automatic and q.Value <= 3 then
+		lowEndDevice = true
+	end
+end)
+
 local function applySettings(full)
-	local s = full.Settings or {}
+	local s = table.clone(full.Settings or {})
+	if lowEndDevice then
+		s.LowGfx = true
+	end
 	userScale = s.UIScale or 1
 	rescale()
 	Sound.SetSettings(s)

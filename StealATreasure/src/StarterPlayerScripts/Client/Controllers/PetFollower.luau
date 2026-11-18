@@ -7,6 +7,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
+local FrameLoop = require(script.Parent.FrameLoop)
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local PetData = require(Shared.PetData)
@@ -174,7 +175,7 @@ function PetFollower.Start()
 	end
 	Players.PlayerAdded:Connect(hook)
 	Players.PlayerRemoving:Connect(clear)
-	RunService.RenderStepped:Connect(function(dt)
+	FrameLoop.Bind("Pets", function(dt)
 		local t = os.clock()
 		local exclude = { folder }
 		for _, p in ipairs(Players:GetPlayers()) do

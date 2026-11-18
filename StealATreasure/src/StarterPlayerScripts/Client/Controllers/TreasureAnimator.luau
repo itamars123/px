@@ -11,6 +11,7 @@
 
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
+local FrameLoop = require(script.Parent.FrameLoop)
 
 local Shared = game:GetService("ReplicatedStorage").Shared
 local Rarities = require(Shared.Rarities)
@@ -72,12 +73,53 @@ local function setExpression(info, expr: string)
 	end
 end
 
-function TreasureAnimator.ApplyQuality(model: Instance)
-	local showFx = TreasureAnimator.Effects and not TreasureAnimator.LowGfx
-	for _, d in ipairs(model:GetDescendants()) do
-		if d:IsA("ParticleEmitter") or d:IsA("Beam") or d:IsA("PointLight") then
-			d.Enabled = showFx
+-- Effect budget (skill animation-vfx: keep ~20-30 visible emitters) -------
+-- Only the nearest / rarest treasures keep particles, beams and lights on.
+local FX_BUDGET = 24
+local FX_RANGE = 130
+local function setFx(info, on: boolean)
+	if info.FxOn == on then
+		return
+	end
+	info.FxOn = on
+	for _, d in ipairs(info.Fx or {}) do
+		if d.Parent then
+			d.Enabled = on
 		end
+	end
+end
+
+function TreasureAnimator.ApplyQuality(model: Instance)
+	local info = tracked[model :: Model]
+	if info then
+		info.FxOn = nil
+	end
+end
+
+local function updateBudget()
+	local cam = workspace.CurrentCamera
+	if not cam then
+		return
+	end
+	local camPos = cam.CFrame.Position
+	local allow = TreasureAnimator.Effects and not TreasureAnimator.LowGfx
+	local list = {}
+	for model, info in pairs(tracked) do
+		if model.Parent then
+			local d = (info.Root.Position - camPos).Magnitude
+			if allow and d < FX_RANGE then
+				-- rarer treasures win ties: each rank is worth 12 studs of distance
+				table.insert(list, { Info = info, Score = d - info.Rank * 12 })
+			else
+				setFx(info, false)
+			end
+		end
+	end
+	table.sort(list, function(a, b)
+		return a.Score < b.Score
+	end)
+	for i, e in ipairs(list) do
+		setFx(e.Info, i <= FX_BUDGET)
 	end
 end
 
@@ -118,6 +160,7 @@ function TreasureAnimator.Track(model: Model)
 		WalkFrom = model:GetAttribute("WalkFrom"),
 		ArriveAt = model:GetAttribute("ArriveAt"),
 		Lightning = model:GetAttribute("Lightning"),
+		Fx = {},
 	}
 	-- spawn animation if it just appeared
 	local spawnTime = model:GetAttribute("SpawnTime")
@@ -128,8 +171,12 @@ function TreasureAnimator.Track(model: Model)
 		end)
 		info.Scale = 0.05
 	end
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("ParticleEmitter") or d:IsA("Beam") or d:IsA("PointLight") then
+			table.insert(info.Fx, d)
+		end
+	end
 	tracked[model] = info
-	TreasureAnimator.ApplyQuality(model)
 	model:GetAttributeChangedSignal("Despawning"):Connect(function()
 		info.DespawnStart = os.clock()
 	end)
@@ -303,7 +350,13 @@ local function animateOne(model: Model, info, t: number, now: number, camPos: Ve
 end
 
 function TreasureAnimator.Start()
-	RunService.RenderStepped:Connect(function()
+	task.spawn(function()
+		while true do
+			updateBudget()
+			task.wait(0.5)
+		end
+	end)
+	FrameLoop.Bind("Treasures", function()
 		local cam = workspace.CurrentCamera
 		if not cam then
 			return
@@ -330,9 +383,7 @@ end
 function TreasureAnimator.SetQuality(lowGfx: boolean, effects: boolean)
 	TreasureAnimator.LowGfx = lowGfx
 	TreasureAnimator.Effects = effects
-	for model in pairs(tracked) do
-		TreasureAnimator.ApplyQuality(model)
-	end
+	updateBudget()
 end
 
 function TreasureAnimator.Untrack(model: Model)

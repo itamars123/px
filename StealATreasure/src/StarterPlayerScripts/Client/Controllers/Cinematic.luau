@@ -6,6 +6,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
+local FrameLoop = require(script.Parent.FrameLoop)
 
 local Lib = require(script.Parent.Parent.UI.Lib)
 
@@ -114,7 +115,7 @@ end
 
 -- Smoothly widen FOV while sprinting
 function Cinematic.Start()
-	RunService.RenderStepped:Connect(function(dt)
+	FrameLoop.Bind("SprintFov", function(dt)
 		if Cinematic.Playing then
 			return
 		end
