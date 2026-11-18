@@ -2,7 +2,52 @@
 
 A colorful multiplayer Roblox simulator. Collect treasures, earn passive income, upgrade and protect your base, sneak into other players' bases to steal their loot, trade, rebirth and become the richest player.
 
-The whole game is generated from Luau code: the map, all 106 treasure models, the bases and the UI. You don't need to upload any assets.
+The whole game is generated from Luau code: the terrain and map, all 112 treasure characters, 52 pets, the bases, the animations, the UI and even the background music. You don't need to upload any assets.
+
+## ✨ What's in the game
+
+- **World**
+  - Real Terrain grass that sways in the wind, plus a lake with a dock, a lighthouse and an island.
+  - Rolling hills, border mountains and 3 pine forests with glowing mushrooms.
+  - A windmill farm, the marketplace, and Pet and Gem shops.
+- **Day, night and weather**
+  - A 12-minute day/night cycle. Lamps switch on at night and music changes mood.
+  - Weather (Clear, Cloudy, Rain, Storm with lightning and thunder, Fog) and clouds that move with the wind.
+- **Animated environment**
+  - Swaying trees, waving flags, spinning windmills and portal rings.
+  - Bobbing gems, glowing lights, a flowing waterfall, a rotating lighthouse beam and chests whose lids open.
+- **Secrets and travel**
+  - Secret areas: Crystal Cave, Sky Island and Hidden Vault.
+  - Event locations: Meteor Crater and Celestial Shrine.
+  - 3 animated portals from the plaza. Sky Island's portal unlocks after you find the island on foot.
+- **Treasure characters**: 108 collectable treasures over 9 rarities (now including **Celestial**), plus 4 rebirth exclusives.
+  - Each has a face that blinks and changes expression: happy, surprised, sleepy at night, excited.
+  - Each has an idle personality: Hop, Dance, Float, Spin, Wiggle or Bounce.
+  - Field treasures **roam**: they walk, run, jump and dance.
+  - Legendary and up do a power spin-jump. Mythical and up have an income **Aura** ability.
+  - Treasures pop in when they spawn and shrink away when they disappear.
+- **Player animations**
+  - Walk, run and jump use Roblox's defaults.
+  - Custom procedural poses: sprint lean (Shift, with stamina), crouch-and-reach while stealing, arms-up carry, celebrate, cheer, wave, flex, dance and a victory spin.
+- **Pets**
+  - 52 pets in 25 species across 9 rarities, hatched from 4 eggs with an animated hatch sequence.
+  - Pets follow you: walkers trot with moving legs and hop when you jump; flyers flap their wings. Tails wag and ears twitch.
+  - Pets give income, luck, speed or gem bonuses. You can equip up to 6.
+- **Bases**
+  - Display stands on 2 floors (up to 36), wall materials you can upgrade (Wood → Diamond), sliding doors and a laser lock.
+  - Security cameras that spot intruders, plus laser traps that zap thieves escaping with your loot.
+  - Alarms, 12 colours to choose from, tower banners, a floating gem statue, and a 💰 collector pad (or buy an Auto Collector).
+- **Economy**
+  - Money and gems, 9 upgrades (Speed, Carry, Base, Protection, Income, Luck, Security, Walls, Second Floor) and 4 abilities.
+  - Gem shop boosts, rebirth, levels and 25 achievements.
+- **Events**: Double Money, Meteor Shower, Golden Treasure Rain (collectable coins), Treasure Apocalypse (red sky), Secret Treasure Spawn, Lucky Treasure (2× luck) and Divine Descent. Each has a banner, sky tint, sounds and camera shake.
+- **Multiplayer**
+  - Stealing and trading, now including pets.
+  - Global leaderboards, multiplayer events and server-wide announcements.
+- **Graphics**
+  - Future lighting (dynamic shadows from every light), reflective water and glass, bloom, sun rays and colour grading.
+  - A cinematic intro with letterbox and depth of field, FOV effects, and scrolling Beam textures.
+- **Console**: gamepad bindings, plus D-pad menus that work with the gamepad cursor.
 
 ---
 
@@ -35,11 +80,14 @@ To rebuild the place file after you edit the code, run `python3 tools/build_plac
 | Bonk a thief | Equip the **Bonk Hammer** (1) and click | Tap |
 | Dash / Super Jump / Cloak | **Q / R / F** | On-screen buttons |
 | Lock base | **L**, the HUD button or the red button in your base | HUD button |
-| Inventory / Index / Shop | **B / N / M** | Left menu |
+| Inventory / Index / Upgrades / Pets | **B / N / M / P** | Left menu |
+| Sprint | Hold **Shift** (L3 on gamepad) | Sprint button |
+| Emotes | **T** (X on gamepad) | Emote button |
+| Collect income | Step on the 💰 pad in your base | HUD "Collect" button while you're in your base |
 
 1. **Collect.** Free treasures spawn in the 8 Treasure Fields. The central market's 10 stalls restock every 45s with treasures you can buy.
 2. **Carry home.** Treasures ride above your head (arms-raised carry pose) and a guide beam points to your base. Walk into your base to deliver them; they go straight onto a free display platform.
-3. **Earn.** Every placed treasure makes money every second, boosted by upgrades, rebirths and events. You also get 10% offline income for up to 8 hours.
+3. **Earn.** Every placed treasure fills your base vault each second, boosted by upgrades, pets, auras, rebirths and events. Collect it from the 💰 pad. You also get 10% offline income for up to 8 hours.
 4. **Steal.** Walk into another base and hold **E** on a treasure. The owner gets a full-screen alarm, and the sirens and lights on their base go off. Make it back to your own base before they bonk you!
 5. **Defend.** Lock your base, buy Fortress Security, and bonk thieves with the hammer so stolen treasure goes back home.
 
@@ -52,8 +100,12 @@ src/
 ├─ shared/            (ReplicatedStorage.Shared)
 │  ├─ Config.lua          all tuning values
 │  ├─ Rarities.lua        8 rarity tiers + effect rules
-│  ├─ TreasureData.lua    106 treasures (102 collectable + 4 rebirth exclusives)
-│  ├─ TreasureModels.lua  procedural 3D models (25 shapes) + particle/beam/halo FX
+│  ├─ TreasureData.lua    112 treasures (108 collectable + 4 rebirth exclusives), personalities, auras
+│  ├─ TreasureModels.lua  procedural 3D models (25 shapes) + faces + particle/beam/halo/orbit FX
+│  ├─ Motion.lua          deterministic roaming path shared by server (validation) and clients
+│  ├─ PetData.lua         52 pets, 25 species, 4 eggs, luck-weighted rolls
+│  ├─ PetModels.lua       procedural pet builder with animatable parts
+│  ├─ AchievementData.lua 25 achievements
 │  ├─ UpgradeData.lua     shop upgrades, abilities, derived stats
 │  ├─ Remotes.lua         RemoteEvent/RemoteFunction declarations
 │  └─ Util.lua            number formatting, deep copy, uid
@@ -62,7 +114,11 @@ src/
 │  └─ Services/
 │     ├─ NetService         single validated, rate-limited request entry point
 │     ├─ DataService        DataStore load/save, session locking, autosave, BindToClose
-│     ├─ MapBuilder         the whole world
+│     ├─ MapBuilder         the whole world (terrain, plaza, base slots, secrets, events)
+│     ├─ MapDetails         lake, hills, forests, windmills, shops, portals, animated tags
+│     ├─ WorldService       day/night clock, weather, chests, portals, event coins
+│     ├─ PetService         hatching, equipping, pet bonuses
+│     ├─ AchievementService achievements + gem rewards
 │     ├─ BaseService        bases, platforms, door barrier, lock, alarm, sign
 │     ├─ CarryService       carrying, pose, delivery, drop/return
 │     ├─ TreasureService    world spawns, market, give/place/store/sell, secrets, magnet
@@ -77,10 +133,11 @@ src/
 │     └─ EventService       Golden Hour, Meteor Shower, Treasure Rain, Divine Descent
 └─ client/            (StarterPlayerScripts.Client)
    ├─ Main.client.lua     builds UI, responsive scaling, starts controllers
-   ├─ Controllers/        State, Sound, WorldFX (animations/effects/prompts), Input
+   ├─ Controllers/        State, Sound, WorldFX (effects/prompts), TreasureAnimator,
+   │                      Emotes, PetFollower, Ambience, Music, Cinematic, Input
    └─ UI/                 Lib, Windows, HUD, Notifications, Preview, and the
-                          Inventory, Index, Shop, Rebirth, Leaderboard, Settings
-                          and Trade windows
+                          Inventory, Pets, Index, Upgrades, Gem Shop, Rebirth,
+                          Leaderboard, Achievements, Settings and Trade windows
 ```
 
 ---
@@ -160,6 +217,14 @@ The client never decides anything. It only sends requests through one rate-limit
 - State replication is debounced: a full snapshot only when something changes, plus small stats packets.
 - Decoration parts are anchored, with shadows off where they don't matter.
 
+## 🧪 Testing in Studio
+
+When you run in Studio, Settings shows **Studio test** buttons that start any world event straight away. Multiplayer can be tested with *Test → Clients and Servers*.
+
 ## 🔊 Sounds
 
-Default sound effects use `rbxasset://sounds/...` files that ship with the Roblox client. You can replace any entry in `Config.Sounds` with your own uploaded `rbxassetid://` audio.
+Default sound effects use `rbxasset://sounds/...` files that ship with the Roblox client. Footstep and jump sounds come from Roblox's built-in character sounds.
+
+**Background music** is a built-in procedural soundtrack (`Controllers/Music.lua`): melody, bass and arpeggios played by pitching one note sample. Day, night and event moods each have their own tempo and scale. To use a real track instead, set `Config.Sounds.Music` to an uploaded audio ID.
+
+You can replace any entry in `Config.Sounds` with your own `rbxassetid://` audio for a more polished sound.
