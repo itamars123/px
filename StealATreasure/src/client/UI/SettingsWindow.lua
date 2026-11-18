@@ -19,7 +19,9 @@ local OPTIONS = {
 	{ Key = "Music", Text = "🎵 Music", Desc = "Background music" },
 	{ Key = "Sfx", Text = "🔊 Sound Effects", Desc = "Pickups, alarms, purchases" },
 	{ Key = "Effects", Text = "✨ Treasure Effects", Desc = "Particles, beams and glow on treasures" },
-	{ Key = "LowGfx", Text = "📱 Performance Mode", Desc = "Lower quality for older phones (no shadows, no treasure animation)" },
+	{ Key = "LowGfx", Text = "📱 Performance Mode", Desc = "Lower quality for older phones (no shadows, simpler animations)" },
+	{ Key = "Weather", Text = "🌧️ Weather Effects", Desc = "Rain, storms, fog and lightning" },
+	{ Key = "Intro", Text = "🎬 Cinematic Intro", Desc = "Play the flyover camera when you join" },
 }
 
 local function current()
@@ -96,7 +98,7 @@ function Settings.Build(content: Frame)
 	})
 	new("TextLabel", {
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, -8, 0, 120),
+		Size = UDim2.new(1, -8, 0, 190),
 		LayoutOrder = 22,
 		Font = T.Body,
 		TextSize = 14,
@@ -104,9 +106,21 @@ function Settings.Build(content: Frame)
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		TextColor3 = T.SubText,
-		Text = "HOW TO PLAY\n• Grab free treasures in the fields or buy them at the market, then carry them home.\n• Treasures on your platforms earn money every second.\n• Sneak into other bases and hold [E] on a treasure to steal it — get it home before they bonk you!\n• Lock your base with the red button. Upgrade protection in the shop.\n• Keys: Q Dash • R Super Jump • F Cloak",
+		Text = "HOW TO PLAY\n• Grab free treasures in the fields or buy them at the market, then carry them home.\n• Treasures on your platforms earn money every second.\n• Sneak into other bases and hold [E] on a treasure to steal it — get it home before they bonk you!\n• Lock your base with the red button. Upgrade walls, cameras and traps in 🛒 Upgrades.\n• Step on the 💰 pad in your base to collect income.\n• Keys: Shift Sprint • Q Dash • R Super Jump • F Cloak • T Emotes • B Items • P Pets • M Upgrades • L Lock\n• Gamepad: L3 Sprint • D-Pad menus • X Emotes",
 		Parent = scroll,
 	})
+	if game:GetService("RunService"):IsStudio() then
+		local h = Lib.label({ Size = UDim2.new(1, -8, 0, 26), LayoutOrder = 30, Text = "🧪 Studio test: start an event", Font = T.Title, TextColor3 = T.Accent, MaxText = 18, Parent = scroll })
+		Lib.textStroke(1.5).Parent = h
+		local row = new("Frame", { BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 84), LayoutOrder = 31, Parent = scroll }, {
+			new("UIGridLayout", { CellSize = UDim2.fromOffset(120, 36), CellPadding = UDim2.fromOffset(6, 6), HorizontalAlignment = Enum.HorizontalAlignment.Center }),
+		})
+		for _, name in ipairs({ "DoubleMoney", "Meteor", "GoldenRain", "Lucky", "Secret", "Apocalypse", "Divine" }) do
+			Lib.button({ Text = name, Color = T.Purple, MaxText = 14, Parent = row, OnClick = function()
+				State.Request("DebugEvent", name)
+			end })
+		end
+	end
 	State.FullChanged.Event:Connect(refresh)
 end
 

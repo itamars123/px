@@ -360,6 +360,66 @@ end
 
 TreasureModels.Shapes = Shapes
 
+-- Faces ---------------------------------------------------------------------
+-- Where each shape's "face" sits (y, z-front, scale). Shapes that already have
+-- eyes (Skull, Idol, Mask) get none. +Z is the front of every model.
+local FACE = {
+	Gem = { 1.9, 1.05, 0.8 },
+	Crown = { 0.75, 1.45, 0.7 },
+	Chalice = { 2.3, 1.02, 0.75 },
+	CoinStack = { 1.0, 0.82, 0.55 },
+	Orb = { 2.1, 1.1, 0.85 },
+	Sword = { 3.55, 0.17, 0.4 },
+	Chest = { 0.55, 0.92, 0.85 },
+	Egg = { 1.6, 0.96, 0.85 },
+	Star = { 2.25, 0.3, 0.6 },
+	Trophy = { 2.6, 0.92, 0.7 },
+	Ring = { 2.85, 0.4, 0.42 },
+	Crystal = { 2.0, 0.42, 0.5 },
+	Key = { 3.45, 0.25, 0.42 },
+	Lamp = { 0.9, 0.76, 0.65 },
+	Potion = { 1.05, 0.96, 0.8 },
+	Cube = { 1.8, 1.1, 0.7 },
+	Pyramid = { 0.85, 1.1, 0.6 },
+	Shield = { 1.95, 0.25, 0.55 },
+	Hourglass = { 2.45, 0.62, 0.5 },
+	Heart = { 2.35, 0.75, 0.8 },
+	Book = { 1.6, 0.42, 0.6 },
+	Feather = { 2.6, 0.14, 0.4 },
+}
+TreasureModels.Face = FACE
+
+local EYE_COLOR = Color3.fromRGB(25, 20, 35)
+local function addFace(b)
+	local f = FACE[b.Def.Shape]
+	if not f then
+		return
+	end
+	local y, z, k = f[1], f[2], f[3]
+	local face = Instance.new("Folder")
+	face.Name = "Face"
+	face.Parent = b.Model
+	local function facePart(name, shape, size, offset, color, mat, rot)
+		local p = b:Part(shape, size, at(offset.X, offset.Y, offset.Z) * (rot or CFrame.identity), color, mat or Enum.Material.SmoothPlastic)
+		p.Name = name
+		p:SetAttribute("BaseSize", p.Size)
+		p.Parent = face
+		return p
+	end
+	for _, side in ipairs({ -1, 1 }) do
+		local name = side < 0 and "EyeL" or "EyeR"
+		facePart(name, "Ball", Vector3.new(0.3, 0.3, 0.3) * k, Vector3.new(side * 0.3 * k, y + 0.12 * k, z), EYE_COLOR)
+		facePart(name .. "Shine", "Ball", Vector3.new(0.1, 0.1, 0.1) * k, Vector3.new(side * 0.3 * k + 0.06 * k, y + 0.19 * k, z + 0.12 * k), Color3.new(1, 1, 1), Enum.Material.Neon)
+		facePart("Cheek" .. name, "Ball", Vector3.new(0.16, 0.16, 0.16) * k, Vector3.new(side * 0.5 * k, y - 0.08 * k, z - 0.02), Color3.fromRGB(255, 130, 160), Enum.Material.SmoothPlastic)
+	end
+	-- smile made of three tilted segments
+	facePart("Mouth1", "Block", Vector3.new(0.14, 0.06, 0.06) * k, Vector3.new(-0.12 * k, y - 0.12 * k, z), EYE_COLOR, nil, CFrame.Angles(0, 0, math.rad(-30)))
+	facePart("Mouth2", "Block", Vector3.new(0.14, 0.06, 0.06) * k, Vector3.new(0, y - 0.16 * k, z), EYE_COLOR)
+	facePart("Mouth3", "Block", Vector3.new(0.14, 0.06, 0.06) * k, Vector3.new(0.12 * k, y - 0.12 * k, z), EYE_COLOR, nil, CFrame.Angles(0, 0, math.rad(30)))
+	local o = facePart("MouthO", "Ball", Vector3.new(0.16, 0.16, 0.16) * k, Vector3.new(0, y - 0.15 * k, z), EYE_COLOR)
+	o.Transparency = 1
+end
+
 -- Effects -------------------------------------------------------------------
 local FX = {
 	Fire = { Tex = TEX_FIRE, C1 = Color3.fromRGB(255, 170, 40), C2 = Color3.fromRGB(255, 50, 0), Speed = 3, Rise = 4, Size = 0.9, Life = 0.9 },
@@ -475,6 +535,32 @@ function TreasureModels.AddEffects(model: Model, def, root: BasePart, scale: num
 		beam.TextureLength = 3
 		beam.Parent = root
 	end
+	if info.Orbit then
+		local moons = Instance.new("Model")
+		moons.Name = "Orbit"
+		for i = 1, 3 do
+			local p = Instance.new("Part")
+			p.Name = "Moon"
+			p.Shape = Enum.PartType.Ball
+			p.Size = Vector3.new(0.5, 0.5, 0.5) * scale
+			p.Material = Enum.Material.Neon
+			p.Color = Color3.fromHSV(0.5 + i * 0.12, 0.5, 1)
+			p.Anchored = false
+			p.CanCollide = false
+			p.CanTouch = false
+			p.CanQuery = false
+			p.Massless = true
+			p.CastShadow = false
+			local a = i / 3 * math.pi * 2
+			p.CFrame = root.CFrame * CFrame.new(math.cos(a) * 2.6 * scale, height, math.sin(a) * 2.6 * scale)
+			local w = Instance.new("WeldConstraint")
+			w.Part0 = root
+			w.Part1 = p
+			w.Parent = p
+			p.Parent = moons
+		end
+		moons.Parent = model
+	end
 	if info.Halo then
 		local halo = Instance.new("Model")
 		halo.Name = "Halo"
@@ -532,6 +618,9 @@ function TreasureModels.Build(def, opts)
 	local builder = newBuilder(model, root, scale, def)
 	local fn = Shapes[def.Shape] or Shapes.Gem
 	fn(builder)
+	if opts.Face ~= false then
+		addFace(builder)
+	end
 
 	if opts.Effects ~= false then
 		TreasureModels.AddEffects(model, def, root, scale)
@@ -539,6 +628,7 @@ function TreasureModels.Build(def, opts)
 
 	model:SetAttribute("TreasureId", def.Id)
 	model:SetAttribute("Rarity", def.Rarity)
+	model:SetAttribute("Personality", def.Personality)
 
 	local cf = opts.CFrame or CFrame.new()
 	model:PivotTo(cf)

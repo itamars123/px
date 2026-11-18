@@ -62,6 +62,13 @@ def main():
         item("StarterPlayerScripts", "StarterPlayerScripts", item("Folder", "Client", build_dir(os.path.join(src, "client")))),
     )
     body += item("Workspace", "Workspace", extra='<bool name="StreamingEnabled">false</bool>')
+    # Future lighting = real-time shadows from every light, reflections and bloom
+    body += item(
+        "Lighting",
+        "Lighting",
+        extra='<token name="Technology">4</token><bool name="GlobalShadows">true</bool>'
+        '<float name="EnvironmentDiffuseScale">0.8</float><float name="EnvironmentSpecularScale">1</float>',
+    )
     xml = (
         '<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" '
         'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '

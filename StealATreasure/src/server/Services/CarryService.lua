@@ -44,46 +44,11 @@ function CarryService.IsCarryingStolen(player: Player): boolean
 	return false
 end
 
--- Carry pose: rotate shoulder joints so both arms hold the treasure overhead.
--- Changing Motor6D.C0 on the server replicates to every client and layers on
--- top of the default animations, so the pose is visible to all players.
-local POSE_ANGLE = math.rad(165)
-local function setPose(character: Model?, on: boolean)
-	if not character then
-		return
-	end
-	local joints = {}
-	local function add(name: string, parentName: string, kind: string)
-		local holder = character:FindFirstChild(parentName)
-		local joint = holder and holder:FindFirstChild(name)
-		if joint and joint:IsA("Motor6D") then
-			table.insert(joints, { joint, kind })
-		end
-	end
-	-- R15
-	add("RightShoulder", "RightUpperArm", "R15")
-	add("LeftShoulder", "LeftUpperArm", "R15")
-	-- R6
-	add("Right Shoulder", "Torso", "R6R")
-	add("Left Shoulder", "Torso", "R6L")
-	for _, j in ipairs(joints) do
-		local joint: Motor6D, kind = j[1], j[2]
-		local original = joint:GetAttribute("OriginalC0")
-		if original == nil then
-			joint:SetAttribute("OriginalC0", joint.C0)
-			original = joint.C0
-		end
-		if on then
-			if kind == "R15" then
-				joint.C0 = original * CFrame.Angles(POSE_ANGLE, 0, 0)
-			elseif kind == "R6R" then
-				joint.C0 = original * CFrame.Angles(0, 0, POSE_ANGLE)
-			else
-				joint.C0 = original * CFrame.Angles(0, 0, -POSE_ANGLE)
-			end
-		else
-			joint.C0 = original
-		end
+-- Carry pose: the server only publishes how many treasures you hold; every
+-- client animates the arms-overhead carry pose procedurally (Emotes controller).
+local function setPose(character: Model?, count: number)
+	if character then
+		character:SetAttribute("Carrying", count)
 	end
 end
 
@@ -110,7 +75,7 @@ local function restack(player: Player)
 			w.Parent = root
 		end
 	end
-	setPose(char, #list > 0)
+	setPose(char, #list)
 	S.PlayerService.ApplyMovement(player)
 end
 

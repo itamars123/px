@@ -78,11 +78,14 @@ function RebirthService.Rebirth(player: Player)
 	S.PlayerService.ApplyMovement(player)
 	S.PlayerService.UpdateOverhead(player)
 	S.PlayerService.ApplyTrail(player)
+	data.Gems += Config.Gems.Rebirth
+	data.Vault = 0
+	S.PlayerService.Emote(player, "Victory", 5)
 	S.StateService.MarkFull(player)
 	task.spawn(S.DataService.Save, player, false)
 	Remotes.Effect:FireClient(player, "Rebirth", data.Rebirths)
 	Remotes.Announce:FireAllClients(("🌀 %s reached Rebirth %d!"):format(player.DisplayName, data.Rebirths), "Mythical")
-	return true, ("REBIRTH %d! +%d%% income forever.%s"):format(data.Rebirths, math.floor(data.Rebirths * Config.Rebirth.IncomeBonusPerRebirth * 100), rewardText)
+	return true, ("REBIRTH %d! +%d%% income forever, +%d 💎.%s"):format(data.Rebirths, math.floor(data.Rebirths * Config.Rebirth.IncomeBonusPerRebirth * 100), Config.Gems.Rebirth, rewardText)
 end
 
 function RebirthService.Init(services)

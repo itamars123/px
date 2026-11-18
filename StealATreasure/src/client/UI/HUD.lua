@@ -34,6 +34,12 @@ local chipLabels = {}
 local abilityButtons = {}
 local eventFrame: Frame
 local eventLabel: TextLabel
+local gemsLabel: TextLabel
+local vaultButton: TextButton
+local staminaSet
+local sprintButton: TextButton
+local emotePanel: Frame
+local sprinting = false
 local displayedMoney = 0
 local targetMoney = 0
 local lastMoney = nil
@@ -93,6 +99,24 @@ local function buildTop()
 	mpsLabel = Lib.label({ Size = UDim2.new(1, -16, 0, 22), Position = UDim2.fromOffset(8, 48), Text = "+$0/s", TextColor3 = T.Green, MaxText = 18, Parent = top })
 	Lib.textStroke(1.5).Parent = mpsLabel
 
+	-- gems + vault (collect) under the money panel
+	local gems = Lib.panel({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(0.5, -158, 0, 8), Size = UDim2.fromOffset(120, 36), BackgroundColor3 = T.Bg, BackgroundTransparency = 0.1, Radius = 12, Parent = gui })
+	Lib.stroke(T.Blue, 2.5).Parent = gems
+	gemsLabel = Lib.label({ Size = UDim2.new(1, -10, 1, -6), Position = UDim2.fromOffset(5, 3), Text = "💎 0", Font = T.Title, TextColor3 = T.Blue:Lerp(Color3.new(1, 1, 1), 0.4), MaxText = 22, Parent = gems })
+	Lib.textStroke(1.5).Parent = gemsLabel
+	vaultButton = Lib.button({
+		Text = "💰 Vault $0",
+		Color = T.Accent,
+		Size = UDim2.fromOffset(150, 36),
+		Position = UDim2.new(0.5, 158, 0, 8),
+		AnchorPoint = Vector2.new(0, 0),
+		MaxText = 18,
+		Parent = gui,
+		OnClick = function()
+			State.Request("Collect")
+		end,
+	})
+
 	local lvl = Lib.panel({ Position = UDim2.fromOffset(12, 8), Size = UDim2.fromOffset(230, 56), BackgroundColor3 = T.Bg, BackgroundTransparency = 0.1, Radius = 14, Parent = gui })
 	Lib.stroke(T.Blue, 2.5).Parent = lvl
 	levelLabel = Lib.label({ Size = UDim2.new(0.6, 0, 0, 24), Position = UDim2.fromOffset(10, 3), Text = "⭐ Level 1", Font = T.Title, TextXAlignment = Enum.TextXAlignment.Left, MaxText = 20, Parent = lvl })
@@ -122,7 +146,7 @@ local function buildMenu()
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 10, 0.5, 0),
-		Size = UDim2.fromOffset(140, 300),
+		Size = UDim2.fromOffset(140, 370),
 		Parent = gui,
 	}, {
 		new("UIGridLayout", {
@@ -133,12 +157,15 @@ local function buildMenu()
 		}),
 	})
 	menuButton(menu, 1, "🎒", "Items", T.Blue, "Inventory")
-	menuButton(menu, 2, "📖", "Index", T.Purple, "Index")
-	menuButton(menu, 3, "🛒", "Shop", T.Green, "Shop")
-	menuButton(menu, 4, "🌀", "Rebirth", T.Pink, "Rebirth")
-	menuButton(menu, 5, "🏆", "Top", T.Accent, "Leaderboard")
-	menuButton(menu, 6, "🤝", "Trade", T.Orange, "Trade")
-	menuButton(menu, 7, "⚙️", "Settings", T.Panel2, "Settings")
+	menuButton(menu, 2, "🐾", "Pets", T.Orange, "Pets")
+	menuButton(menu, 3, "📖", "Index", T.Purple, "Index")
+	menuButton(menu, 4, "🛒", "Upgrade", T.Green, "Shop")
+	menuButton(menu, 5, "💎", "Gems", T.Blue, "GemShop")
+	menuButton(menu, 6, "🌀", "Rebirth", T.Pink, "Rebirth")
+	menuButton(menu, 7, "🏆", "Top", T.Accent, "Leaderboard")
+	menuButton(menu, 8, "🤝", "Trade", T.Orange, "Trade")
+	menuButton(menu, 9, "🎖️", "Awards", T.Accent, "Achievements")
+	menuButton(menu, 10, "⚙️", "Settings", T.Panel2, "Settings")
 end
 
 local function buildBottom()
@@ -182,6 +209,60 @@ local function buildBottom()
 	chip("Steal", T.Orange)
 	chip("Locked", T.Green)
 	chip("Gold", T.Accent)
+	chip("Boost", T.Green)
+	chip("Luck", T.Green)
+	-- stamina bar
+	local _, setter = Lib.bar({ Size = UDim2.fromOffset(190, 12), Position = UDim2.new(0.5, 0, 1, -50), AnchorPoint = Vector2.new(0.5, 1), Color = T.Green, Parent = bottom })
+	staminaSet = setter
+end
+
+function HUD.SetSprint(on: boolean)
+	if sprinting == on then
+		return
+	end
+	sprinting = on
+	if sprintButton then
+		Lib.setButtonColor(sprintButton, on and T.Green or T.Panel2)
+	end
+	State.Ask("Sprint", on)
+end
+
+local EMOTES = { { "Dance", "💃" }, { "Wave", "👋" }, { "Cheer", "🙌" }, { "Flex", "💪" }, { "Victory", "🏆" } }
+function HUD.ToggleEmotes()
+	emotePanel.Visible = not emotePanel.Visible
+end
+
+local function buildActions()
+	-- sprint + emote buttons (bottom-left on PC, above the thumbstick on mobile)
+	local touch = UserInputService.TouchEnabled
+	local holder = new("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = touch and Vector2.new(1, 0.5) or Vector2.new(0, 1),
+		Position = touch and UDim2.new(1, -12, 0.38, 0) or UDim2.new(0, 12, 1, -12),
+		Size = touch and UDim2.fromOffset(70, 136) or UDim2.fromOffset(150, 70),
+		Parent = gui,
+	}, { Lib.list(touch and Enum.FillDirection.Vertical or Enum.FillDirection.Horizontal, 8, Enum.HorizontalAlignment.Right, Enum.VerticalAlignment.Bottom) })
+	sprintButton = Lib.button({ Text = touch and "🏃 Sprint" or "🏃 [Shift]", Color = T.Panel2, Size = UDim2.fromOffset(70, 60), Radius = 30, MaxText = 14, Parent = holder, OnClick = function()
+		HUD.SetSprint(not sprinting)
+	end })
+	Lib.button({ Text = touch and "😀 Emote" or "😀 [T]", Color = T.Pink, Size = UDim2.fromOffset(70, 60), Radius = 30, MaxText = 14, Parent = holder, OnClick = HUD.ToggleEmotes })
+	emotePanel = Lib.panel({
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -170),
+		Size = UDim2.fromOffset(360, 70),
+		BackgroundColor3 = T.Bg,
+		BackgroundTransparency = 0.1,
+		Visible = false,
+		Parent = gui,
+	})
+	Lib.stroke(T.Pink, 2.5).Parent = emotePanel
+	Lib.list(Enum.FillDirection.Horizontal, 6, Enum.HorizontalAlignment.Center, Enum.VerticalAlignment.Center).Parent = emotePanel
+	for i, e in ipairs(EMOTES) do
+		Lib.button({ Text = e[2] .. " " .. e[1], Color = T.Panel2, Size = UDim2.fromOffset(64, 54), LayoutOrder = i, MaxText = 13, Parent = emotePanel, OnClick = function()
+			State.Request("Emote", e[1])
+			emotePanel.Visible = false
+		end })
+	end
 end
 
 local function buildAbilities()
@@ -273,6 +354,20 @@ local function onStats(stats)
 	lastMoney = stats.Money
 	local mult = (stats.EventMultiplier or 1) > 1 and ("  🌟x" .. stats.EventMultiplier) or ""
 	mpsLabel.Text = ("+%s/s%s"):format(Util.Money(stats.MPS or 0), mult)
+	gemsLabel.Text = "💎 " .. Util.Abbreviate(stats.Gems or 0)
+	local full = State.Full
+	if full and full.AutoCollect then
+		vaultButton.Text = "🤖 Auto Collect"
+		Lib.setButtonColor(vaultButton, T.Panel2)
+	else
+		vaultButton.Text = "💰 Collect " .. Util.Money(math.floor(stats.Vault or 0))
+		Lib.setButtonColor(vaultButton, (stats.Vault or 0) >= 1 and T.Accent or T.Panel2)
+	end
+	staminaSet((stats.Stamina or 0) / (stats.MaxStamina or 100), "⚡ Stamina")
+	if sprinting and (stats.Stamina or 0) <= 0 then
+		sprinting = false
+		Lib.setButtonColor(sprintButton, T.Panel2)
+	end
 	levelLabel.Text = ("⭐ Level %d"):format(stats.Level)
 	rebirthLabel.Text = ("🌀 %d"):format(stats.Rebirths or 0)
 	levelSet(stats.XP / math.max(1, stats.XPNext), ("%s / %s XP"):format(Util.Abbreviate(stats.XP), Util.Abbreviate(stats.XPNext)))
@@ -302,7 +397,17 @@ local function tick()
 		local lock = stats.LockEnd - now
 		setChip("Locked", lock > 0 and ("🔒 Base locked %ds"):format(math.ceil(lock)) or nil)
 		local gold = (stats.EventMultiplier or 1) > 1
-		setChip("Gold", gold and "🌟 GOLDEN HOUR" or nil)
+		setChip("Gold", gold and "💸 DOUBLE MONEY" or nil)
+		local active = {}
+		local t0 = stats.ServerTime or os.time()
+		for name, expiry in pairs(stats.Boosts or {}) do
+			if expiry > t0 then
+				table.insert(active, name)
+			end
+		end
+		setChip("Boost", #active > 0 and ("⏳ Boost: " .. table.concat(active, ", ")) or nil)
+		local luck = stats.Luck or 1
+		setChip("Luck", luck > 1.001 and ("🍀 Luck x%.1f"):format(luck) or nil)
 		local cooldown = stats.LockCooldownEnd - now
 		if lock > 0 then
 			lockButton.Text = ("🔒 LOCKED %ds"):format(math.ceil(lock))
@@ -345,6 +450,7 @@ function HUD.Init(parentGui: ScreenGui)
 	buildMenu()
 	buildBottom()
 	buildAbilities()
+	buildActions()
 	State.StatsChanged.Event:Connect(onStats)
 	State.FullChanged.Event:Connect(function(full)
 		targetMoney = full.Money

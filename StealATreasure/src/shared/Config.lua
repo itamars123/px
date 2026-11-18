@@ -43,6 +43,8 @@ Config.StartingPlots = 6
 Config.PlotsPerBaseLevel = 2
 Config.MaxBaseLevel = 10
 Config.MaxStorage = 60 -- inventory (unplaced) capacity
+Config.SecondFloorPlots = 12
+Config.SecondFloorHeight = 13
 
 -- Stealing / protection -----------------------------------------------------
 Config.Steal = {
@@ -86,10 +88,13 @@ Config.Market = {
 -- Rarity weights used by the different spawn pools.
 Config.SpawnPools = {
 	Field = { Common = 60, Uncommon = 26, Rare = 10, Epic = 3.2, Legendary = 0.7, Mythical = 0.1 },
-	Market = { Common = 30, Uncommon = 30, Rare = 22, Epic = 11, Legendary = 5, Mythical = 1.6, Secret = 0.35, Divine = 0.05 },
-	Secret = { Rare = 40, Epic = 32, Legendary = 18, Mythical = 7, Secret = 2.5, Divine = 0.5 },
-	Meteor = { Epic = 55, Legendary = 30, Mythical = 12, Secret = 2.6, Divine = 0.4 },
-	Divine = { Mythical = 60, Secret = 30, Divine = 10 },
+	Market = { Common = 30, Uncommon = 30, Rare = 22, Epic = 11, Legendary = 5, Mythical = 1.6, Secret = 0.35, Divine = 0.05, Celestial = 0.01 },
+	Secret = { Rare = 40, Epic = 32, Legendary = 18, Mythical = 7, Secret = 2.5, Divine = 0.5, Celestial = 0.08 },
+	Meteor = { Epic = 55, Legendary = 30, Mythical = 12, Secret = 2.6, Divine = 0.4, Celestial = 0.05 },
+	Divine = { Mythical = 55, Secret = 30, Divine = 12, Celestial = 3 },
+	Apocalypse = { Epic = 40, Legendary = 35, Mythical = 18, Secret = 5, Divine = 1.6, Celestial = 0.4 },
+	SecretSpawn = { Secret = 75, Divine = 20, Celestial = 5 },
+	Lucky = { Rare = 30, Epic = 35, Legendary = 22, Mythical = 9, Secret = 3, Divine = 0.8, Celestial = 0.2 },
 }
 
 -- Events -------------------------------------------------------------------
@@ -100,6 +105,61 @@ Config.Events = {
 	GoldenHourMultiplier = 2,
 	TreasureRainCount = 24,
 	MeteorCount = 6,
+	ApocalypseDuration = 75,
+	LuckyDuration = 150,
+	LuckyMultiplier = 2,
+	CoinValueSeconds = 4, -- golden coins are worth this many seconds of your income
+}
+
+-- Gems (premium soft currency) ---------------------------------------------
+Config.Gems = {
+	Start = 25,
+	PerLevel = 3, -- gems = level * PerLevel on level up
+	SecretFound = 25,
+	Rebirth = 60,
+	DiscoveryByRank = { [4] = 2, [5] = 5, [6] = 10, [7] = 20, [8] = 40, [9] = 80 },
+}
+
+-- Sprint / stamina ------------------------------------------------------------
+Config.Sprint = {
+	Multiplier = 1.45,
+	MaxStamina = 100,
+	Drain = 18, -- per second
+	Regen = 12, -- per second
+	MinToStart = 15,
+}
+
+-- Security systems -----------------------------------------------------------
+Config.Security = {
+	TrapChancePerLevel = 0.07, -- chance a thief is zapped leaving your base, per Security level
+	MaxTrapChance = 0.6,
+	CameraAlertCooldown = 20,
+	WallHoldBonus = 0.15, -- extra steal hold seconds per wall tier
+}
+
+-- World ---------------------------------------------------------------------
+Config.World = {
+	DayLength = 720, -- seconds for a full day/night cycle
+	WeatherMin = 150,
+	WeatherMax = 300,
+	Weather = { Clear = 40, Cloudy = 25, Rain = 18, Storm = 9, Fog = 8 },
+	ChestInterval = 45,
+	MaxChests = 5,
+	WanderRadius = 7,
+}
+
+-- Luck --------------------------------------------------------------------------
+Config.Luck = {
+	PerUpgrade = 0.1,
+	UpgradeChancePerLuck = 0.08, -- chance per +1.0 luck to bump a pickup up one rarity
+	MaxUpgradeChance = 0.5,
+}
+
+-- Pets -------------------------------------------------------------------------
+Config.Pets = {
+	StartSlots = 3,
+	MaxSlots = 6,
+	MaxOwned = 120,
 }
 
 -- Rebirth ------------------------------------------------------------------
@@ -160,7 +220,19 @@ Config.Sounds = {
 	Legendary = "rbxasset://sounds/electronicpingshort.wav",
 	Event = "rbxasset://sounds/electronicpingshort.wav",
 	Lock = "rbxasset://sounds/snap.wav",
-	-- Background music. Set to an uploaded/licensed audio asset id to enable.
+	Collect = "rbxasset://sounds/electronicpingshort.wav",
+	Steal = "rbxasset://sounds/swordlunge.wav",
+	Spawn = "rbxasset://sounds/clickfast.wav",
+	ChestOpen = "rbxasset://sounds/unsheath.wav",
+	Hatch = "rbxasset://sounds/snap.wav",
+	Thunder = "rbxasset://sounds/Rocket shot.wav",
+	Portal = "rbxasset://sounds/swoosh.wav",
+	Discovery = "rbxasset://sounds/victory.wav",
+	-- The built-in music sequencer plays melodies with this note sample.
+	MusicNote = "rbxasset://sounds/electronicpingshort.wav",
+	MusicBass = "rbxasset://sounds/button.wav",
+	-- Optional: an uploaded/licensed music asset id. When set it replaces the
+	-- built-in procedural soundtrack.
 	Music = "",
 }
 

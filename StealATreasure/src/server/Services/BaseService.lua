@@ -12,6 +12,8 @@ local TreasureModels = require(Shared.TreasureModels)
 local UpgradeData = require(Shared.UpgradeData)
 local Rarities = require(Shared.Rarities)
 local Util = require(Shared.Util)
+local Remotes = require(Shared.Remotes)
+local CollectionService = game:GetService("CollectionService")
 
 local S -- services table
 
@@ -38,7 +40,17 @@ local function part(parent, size, cf, color, material, props)
 end
 
 -- Shell -------------------------------------------------------------------------
+local GROUND_PLOTS = Config.PlotColumns * Config.PlotRows
+local TOTAL_PLOTS = GROUND_PLOTS + Config.SecondFloorPlots
+BaseService.TotalPlots = TOTAL_PLOTS
+
 local function plotLocal(index: number): Vector3
+	if index > GROUND_PLOTS then
+		local j = index - GROUND_PLOTS - 1
+		local r2 = math.floor(j / 6)
+		local c2 = j % 6
+		return Vector3.new((c2 - 2.5) * Config.PlotSpacing, Config.SecondFloorHeight, 10 + r2 * 12)
+	end
 	local r = math.floor((index - 1) / Config.PlotColumns)
 	local c = (index - 1) % Config.PlotColumns
 	local x = (c - (Config.PlotColumns - 1) / 2) * Config.PlotSpacing
@@ -87,6 +99,83 @@ local function buildShell(index: number, cf: CFrame, parent: Instance)
 		part(walls, Vector3.new(6, wallH + 6, 6), L(x, (wallH + 6) / 2 + 1, z), color, Enum.Material.Brick)
 		part(walls, Vector3.new(7, 4, 7), L(x, wallH + 9, z), Color3.fromRGB(70, 60, 90), Enum.Material.Slate)
 	end
+
+	for _, w in ipairs(walls:GetChildren()) do
+		if w.Material == Enum.Material.Brick then
+			w:SetAttribute("Paint", w.Color == wallColor and "Wall" or "Tower")
+		elseif w.Color == color then
+			w:SetAttribute("Paint", "Trim")
+		end
+	end
+	model:FindFirstChild("Carpet"):SetAttribute("Paint", "Carpet")
+
+	-- Second floor (hidden until the Floors upgrade is bought)
+	local floorH = Config.SecondFloorHeight
+	local f2 = Instance.new("Folder")
+	f2.Name = "SecondFloor"
+	f2.Parent = model
+	local slab = part(f2, Vector3.new(Config.BaseSize - 4, 1, 36), L(0, floorH + 0.5, 16), Color3.fromRGB(235, 225, 210), Enum.Material.WoodPlanks, { Name = "Slab" })
+	slab:SetAttribute("Paint", "Floor2")
+	local ramp = Instance.new("WedgePart")
+	ramp.Name = "Stairs"
+	ramp.Anchored = true
+	ramp.Size = Vector3.new(8, floorH + 1, 28)
+	ramp.CFrame = L(-29.5, (floorH + 1) / 2 + 0.5, -16)
+	ramp.Color = Color3.fromRGB(200, 180, 150)
+	ramp.Material = Enum.Material.WoodPlanks
+	ramp:SetAttribute("Paint", "Floor2")
+	ramp.Parent = f2
+	local rail = part(f2, Vector3.new(Config.BaseSize - 16, 3, 0.6), L(6, floorH + 2.5, -1.7), color, Enum.Material.Glass, { Name = "Rail", Transparency = 0.4 })
+	rail:SetAttribute("Paint", "Floor2")
+	for i = 0, 3 do
+		local beamPart = part(f2, Vector3.new(1.5, floorH, 1.5), L(-24 + i * 16, floorH / 2 + 1, -1.2), Color3.fromRGB(200, 180, 150), Enum.Material.Wood, { Name = "Support" })
+		beamPart:SetAttribute("Paint", "Floor2")
+	end
+
+	-- Sliding doors (the client animates them using the base's "Locked" attribute)
+	for _, side in ipairs({ -1, 1 }) do
+		local door = part(model, Vector3.new(8, 14, 0.8), L(side * (16 / 2 + 4.2), 8, -half + 1), Color3.fromRGB(90, 95, 120), Enum.Material.DiamondPlate, {
+			Name = side < 0 and "DoorL" or "DoorR",
+			CanCollide = false,
+		})
+		door:SetAttribute("OpenCF", door.CFrame)
+		door:SetAttribute("ClosedCF", L(side * 4, 8, -half + 1))
+		CollectionService:AddTag(door, "SlidingDoor")
+	end
+
+	-- Security cameras on the front towers
+	for _, x in ipairs({ -1, 1 }) do
+		local mount = L(x * (half - 1), wallH + 4, -half - 2)
+		local cam = Instance.new("Model")
+		cam.Name = "SecurityCamera"
+		local body = part(cam, Vector3.new(1.4, 1.4, 2.6), mount, Color3.fromRGB(230, 230, 235), Enum.Material.SmoothPlastic, { Name = "CamBody", CanCollide = false })
+		part(cam, Vector3.new(0.9, 0.9, 0.3), mount * CFrame.new(0, 0, -1.4), Color3.fromRGB(60, 255, 120), Enum.Material.Neon, { Name = "Lens", CanCollide = false })
+		cam.PrimaryPart = body
+		cam:SetAttribute("Paint", "Camera")
+		cam.Parent = model
+		CollectionService:AddTag(cam, "SecurityCam")
+	end
+
+	-- Collector pad (step on it to bank your income)
+	local pad = part(model, Vector3.new(6, 0.4, 6), L(12, 1.2, -half + 6), Color3.fromRGB(255, 205, 60), Enum.Material.Neon, { Name = "CollectPad", CanCollide = false, CanTouch = true })
+	local padBB, padLabel = S.MapBuilder.Billboard(pad, "💰 $0", Color3.fromRGB(255, 230, 120), UDim2.fromOffset(220, 50), 3)
+	padBB.MaxDistance = 90
+	part(model, Vector3.new(6.6, 0.3, 6.6), L(12, 1.05, -half + 6), Color3.fromRGB(90, 70, 30), Enum.Material.Metal)
+
+	-- Animated decorations: tower banners + floating gem statue
+	for _, c in ipairs({ { -1, 1 }, { 1, 1 } }) do
+		local pole = part(walls, Vector3.new(0.4, 8, 0.4), L(c[1] * (half - 1), wallH + 15, c[2] * (half - 1)), Color3.fromRGB(240, 240, 240), Enum.Material.Metal)
+		local flag = part(walls, Vector3.new(0.15, 2.6, 4), pole.CFrame * CFrame.new(0, 2.6, 2.1), color, Enum.Material.Fabric, { CanCollide = false })
+		flag:SetAttribute("Paint", "Trim")
+		CollectionService:AddTag(flag, "Flag")
+		flag:SetAttribute("SwayAmount", 0.3)
+	end
+	local statue = part(model, Vector3.new(3, 3, 3), L(0, 9, -half + 8) * CFrame.Angles(math.rad(45), 0, math.rad(45)), color, Enum.Material.Neon, { Name = "Statue", CanCollide = false })
+	statue:SetAttribute("Paint", "Trim")
+	CollectionService:AddTag(statue, "Spin")
+	CollectionService:AddTag(statue, "Bob")
+	statue:SetAttribute("BobHeight", 0.8)
+	part(model, Vector3.new(3, 5, 3), L(0, 3.5, -half + 8), Color3.fromRGB(245, 245, 250), Enum.Material.Marble)
 
 	-- Door barrier (laser wall)
 	local barrier = part(model, Vector3.new(doorW, 14, 1), L(0, 8, -half + 1), Color3.fromRGB(255, 40, 60), Enum.Material.ForceField, {
@@ -175,12 +264,12 @@ local function buildShell(index: number, cf: CFrame, parent: Instance)
 	plots.Name = "Plots"
 	plots.Parent = model
 	local plotParts = {}
-	local total = Config.PlotColumns * Config.PlotRows
-	for i = 1, total do
+	for i = 1, TOTAL_PLOTS do
 		local lp = plotLocal(i)
-		local plot = part(plots, Vector3.new(6, 1.5, 6), L(lp.X, 1.75, lp.Z), Color3.fromRGB(250, 250, 255), Enum.Material.Marble, { Name = "Plot" .. i })
+		local plot = part(plots, Vector3.new(6, 1.5, 6), L(lp.X, 1.75 + lp.Y, lp.Z), Color3.fromRGB(250, 250, 255), Enum.Material.Marble, { Name = "Plot" .. i })
 		plot:SetAttribute("Index", i)
-		local rim = part(plots, Vector3.new(6.4, 0.3, 6.4), L(lp.X, 2.4, lp.Z), color, Enum.Material.Neon, { Name = "Rim" .. i, CanCollide = false })
+		local rim = part(plots, Vector3.new(6.4, 0.3, 6.4), L(lp.X, 2.4 + lp.Y, lp.Z), color, Enum.Material.Neon, { Name = "Rim" .. i, CanCollide = false })
+		rim:SetAttribute("Paint", "Rim")
 		local lockBB, lockLabel = S.MapBuilder.Billboard(plot, "🔒", Color3.fromRGB(255, 255, 255), UDim2.fromOffset(40, 40), 2)
 		lockBB.Name = "LockedLabel"
 		lockBB.MaxDistance = 80
@@ -214,12 +303,92 @@ local function buildShell(index: number, cf: CFrame, parent: Instance)
 		Title = title,
 		Sub = sub,
 		Plots = plotParts,
+		Pad = pad,
+		PadLabel = padLabel,
+		SecondFloor = f2,
 		TreasureFolder = treasures,
 		Zone = zone,
 		PlotModels = {}, -- [plotIndex] = { Uid, Model }
 		Owner = nil :: Player?,
 		AlarmUntil = 0,
 	}
+end
+
+-- Personalisation ------------------------------------------------------------
+function BaseService.ApplyStyle(base, data)
+	local color = data.BaseColor and data.BaseColor > 0 and UpgradeData.BaseColors[data.BaseColor] or base.Color
+	local tier = UpgradeData.WallTier(data)
+	local floors = (data.Upgrades.Floors or 0) > 0
+	local security = data.Upgrades.Security or 0
+	local key = ("%s|%s|%s|%d"):format(color:ToHex(), tier.Name, tostring(floors), security)
+	if base.StyleKey == key then
+		return
+	end
+	base.StyleKey = key
+	local wallMat = (Enum.Material :: any)[tier.Material]
+	local wallColor = color:Lerp(Color3.new(1, 1, 1), 0.25)
+	if tier.Name == "Gold" then
+		wallColor = Color3.fromRGB(255, 205, 70)
+	elseif tier.Name == "Diamond" then
+		wallColor = Color3.fromRGB(190, 240, 255)
+	end
+	for _, d in ipairs(base.Model:GetDescendants()) do
+		local paint = d:GetAttribute("Paint")
+		if paint and d:IsA("BasePart") then
+			if paint == "Wall" then
+				d.Material = wallMat
+				d.Color = wallColor
+				d.Transparency = tier.Name == "Diamond" and 0.15 or 0
+			elseif paint == "Tower" then
+				d.Material = wallMat
+				d.Color = color
+			elseif paint == "Trim" or paint == "Rim" then
+				d.Color = color
+			elseif paint == "Carpet" then
+				d.Color = color:Lerp(Color3.new(1, 1, 1), 0.55)
+			elseif paint == "Floor2" then
+				local visible = floors
+				d.Transparency = visible and (d.Name == "Rail" and 0.4 or 0) or 1
+				d.CanCollide = visible
+			end
+		elseif paint == "Camera" and d:IsA("Model") then
+			for _, cp in ipairs(d:GetDescendants()) do
+				if cp:IsA("BasePart") then
+					cp.Transparency = security > 0 and 0 or 1
+				end
+			end
+		end
+	end
+	base.Model:SetAttribute("Security", security)
+	base.Model:SetAttribute("Color", color)
+end
+
+function BaseService.SetColor(player: Player, index)
+	local data = S.DataService.Get(player)
+	if not data or typeof(index) ~= "number" then
+		return false, "Bad request"
+	end
+	index = math.floor(index)
+	if index < 0 or index > #UpgradeData.BaseColors then
+		return false, "Unknown colour"
+	end
+	data.BaseColor = index
+	BaseService.Refresh(player)
+	S.StateService.MarkFull(player)
+	return true, "Base colour updated! 🎨"
+end
+
+-- Collector pad --------------------------------------------------------------
+function BaseService.Collect(player: Player)
+	local data = S.DataService.Get(player)
+	if not data or (data.Vault or 0) < 1 then
+		return
+	end
+	local amount = math.floor(data.Vault)
+	data.Vault -= amount
+	S.EconomyService.AddMoney(player, amount)
+	Remotes.Effect:FireClient(player, "Collect", amount)
+	S.StateService.MarkFull(player)
 end
 
 -- Queries --------------------------------------------------------------------------
@@ -271,12 +440,31 @@ function BaseService.FreePlot(player: Player): number?
 			used[t.Plot] = true
 		end
 	end
-	for i = 1, UpgradeData.PlotCount(data) do
+	for _, i in ipairs(BaseService.UnlockedPlots(data)) do
 		if not used[i] then
 			return i
 		end
 	end
 	return nil
+end
+
+-- Ordered list of unlocked plot indices (ground floor first, then 2nd floor).
+function BaseService.UnlockedPlots(data): { number }
+	local list = {}
+	local ground = math.min(GROUND_PLOTS, Config.StartingPlots + (UpgradeData.BaseLevel(data) - 1) * Config.PlotsPerBaseLevel)
+	for i = 1, ground do
+		table.insert(list, i)
+	end
+	if (data.Upgrades.Floors or 0) > 0 then
+		for i = GROUND_PLOTS + 1, TOTAL_PLOTS do
+			table.insert(list, i)
+		end
+	end
+	return list
+end
+
+function BaseService.IsPlotUnlocked(data, index: number): boolean
+	return table.find(BaseService.UnlockedPlots(data), index) ~= nil
 end
 
 function BaseService.CountPlaced(data): number
@@ -368,7 +556,9 @@ function BaseService.Refresh(player: Player)
 	if not base or not data or not session then
 		return
 	end
-	local unlocked = UpgradeData.PlotCount(data)
+	BaseService.ApplyStyle(base, data)
+	local groundUnlocked = math.min(GROUND_PLOTS, UpgradeData.PlotCount(data))
+	local hasFloor2 = (data.Upgrades.Floors or 0) > 0
 	local desired = {}
 	for uid, t in pairs(data.Treasures) do
 		if t.Plot and not session.Stealing[uid] then
@@ -376,10 +566,13 @@ function BaseService.Refresh(player: Player)
 		end
 	end
 	for i, p in ipairs(base.Plots) do
-		local isUnlocked = i <= unlocked
-		p.Plot.Transparency = isUnlocked and 0 or 0.55
-		p.Rim.Transparency = isUnlocked and 0 or 0.8
-		p.LockBB.Enabled = not isUnlocked
+		local onFloor2 = i > GROUND_PLOTS
+		local isUnlocked = (onFloor2 and hasFloor2) or (not onFloor2 and i <= groundUnlocked)
+		local hidden = onFloor2 and not hasFloor2
+		p.Plot.Transparency = hidden and 1 or (isUnlocked and 0 or 0.55)
+		p.Plot.CanCollide = not hidden
+		p.Rim.Transparency = hidden and 1 or (isUnlocked and 0 or 0.8)
+		p.LockBB.Enabled = not isUnlocked and not hidden
 
 		local current = base.PlotModels[i]
 		local want = desired[i]
@@ -392,7 +585,8 @@ function BaseService.Refresh(player: Player)
 			local entry = data.Treasures[want]
 			local def = TreasureData.Get(entry.Id)
 			if def then
-				local cf = p.Plot.CFrame * CFrame.new(0, p.Plot.Size.Y / 2, 0)
+				-- rotate so the treasure's face looks toward the door
+				local cf = p.Plot.CFrame * CFrame.new(0, p.Plot.Size.Y / 2, 0) * CFrame.Angles(0, math.pi, 0)
 				local model = TreasureModels.Build(def, { CFrame = cf, Scale = 1 })
 				model:SetAttribute("Uid", want)
 				model:SetAttribute("OwnerId", player.UserId)
@@ -446,6 +640,10 @@ function BaseService.UpdateSign(player: Player)
 		lockText = ("  🔒 %ds"):format(math.ceil(remaining))
 	end
 	base.Sub.Text = ("💰 %s/s%s"):format(Util.Abbreviate(session.MPS or 0), lockText)
+	local data = S.DataService.Get(player)
+	if data then
+		base.PadLabel.Text = data.AutoCollect and ("🤖 AUTO • %s/s"):format(Util.Abbreviate(session.MPS or 0)) or ("💰 " .. Util.Money(math.floor(data.Vault or 0)) .. "\nstep to collect")
+	end
 end
 
 -- Locking ----------------------------------------------------------------------------
@@ -461,6 +659,7 @@ local function applyLockVisual(base, locked: boolean)
 	end
 	base.Button.Color = locked and Color3.fromRGB(80, 255, 120) or Color3.fromRGB(255, 60, 60)
 	base.Locked = locked
+	base.Model:SetAttribute("Locked", locked)
 end
 
 -- Moves non-owners standing inside a base out of the door.
@@ -555,11 +754,67 @@ function BaseService.Release(player: Player)
 			base.Title.Text = "EMPTY BASE"
 			base.Sub.Text = ""
 			base.Siren:Stop()
+			base.StyleKey = nil
+			base.PadLabel.Text = ""
 			applyLockVisual(base, false)
-			for _, p in ipairs(base.Plots) do
-				p.Plot.Transparency = 0.55
-				p.Rim.Transparency = 0.8
-				p.LockBB.Enabled = true
+			for i, p in ipairs(base.Plots) do
+				local f2 = i > GROUND_PLOTS
+				p.Plot.Transparency = f2 and 1 or 0.55
+				p.Rim.Transparency = f2 and 1 or 0.8
+				p.LockBB.Enabled = not f2
+			end
+			for _, d in ipairs(base.SecondFloor:GetChildren()) do
+				d.Transparency = 1
+				d.CanCollide = false
+			end
+		end
+	end
+end
+
+-- Security: cameras spot intruders, traps zap escaping thieves ---------------------
+function BaseService.SecurityTick(base, owner: Player)
+	local data = S.DataService.Get(owner)
+	local session = S.DataService.Session(owner)
+	if not data or not session then
+		return
+	end
+	local level = data.Upgrades.Security or 0
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= owner then
+			local ses = S.DataService.Session(p)
+			local char = p.Character
+			local hrp = char and char:FindFirstChild("HumanoidRootPart")
+			if ses and hrp then
+				local inside = BaseService.IsInside(base, hrp.Position)
+				-- camera alerts
+				if inside and level > 0 then
+					local last = session.CameraAlerts[p] or 0
+					if os.clock() - last > Config.Security.CameraAlertCooldown then
+						session.CameraAlerts[p] = os.clock()
+						base.Model:SetAttribute("CameraAlert", now())
+						S.NetService.Notify(owner, ("📷 Security camera spotted %s in your base!"):format(p.DisplayName), "warn")
+					end
+				end
+				-- laser trap on escape
+				for _, item in ipairs(table.clone(ses.Carrying)) do
+					if item.Source == "Steal" and item.Victim == owner then
+						if inside then
+							item.WasInside = true
+						elseif item.WasInside and not item.TrapRolled then
+							item.TrapRolled = true
+							local chance = math.min(Config.Security.MaxTrapChance, level * Config.Security.TrapChancePerLevel)
+							if level > 0 and math.random() < chance then
+								S.CarryService.Remove(p, item)
+								S.StealService.Return(item, "trapped")
+								Remotes.Effect:FireAllClients("Zap", base.Barrier.Position + Vector3.new(0, 6, 0), hrp.Position)
+								Remotes.Effect:FireClient(p, "Knockback", (hrp.Position - base.Barrier.Position).Unit * 50 + Vector3.new(0, 30, 0), 1.5)
+								S.NetService.Notify(p, "⚡ ZAPPED by the security laser! The treasure went back.", "error")
+								S.NetService.Notify(owner, ("⚡ Your laser trap caught %s!"):format(p.DisplayName), "success")
+								data.Stats.Defends += 1
+							end
+						end
+					end
+				end
 			end
 		end
 	end
@@ -576,6 +831,24 @@ function BaseService.Start()
 	for i, cf in ipairs(S.MapBuilder.Map.BaseSlots) do
 		local base = buildShell(i, cf, folder)
 		BaseService.Bases[i] = base
+		base.Pad.Touched:Connect(function(hit)
+			local who = Players:GetPlayerFromCharacter(hit.Parent)
+			if who and who == base.Owner then
+				BaseService.Collect(who)
+			end
+		end)
+		-- hide the second floor until bought
+		for _, d in ipairs(base.SecondFloor:GetChildren()) do
+			d.Transparency = 1
+			d.CanCollide = false
+		end
+		for j, p in ipairs(base.Plots) do
+			if j > GROUND_PLOTS then
+				p.Plot.Transparency = 1
+				p.Rim.Transparency = 1
+				p.LockBB.Enabled = false
+			end
+		end
 		base.LockPrompt.Triggered:Connect(function(who)
 			if base.Owner == who then
 				local ok, msg = BaseService.RequestLock(who)
@@ -586,6 +859,17 @@ function BaseService.Start()
 
 	S.NetService.Handle("LockBase", function(player)
 		return BaseService.RequestLock(player)
+	end)
+	S.NetService.Handle("SetBaseColor", BaseService.SetColor)
+	S.NetService.Handle("Collect", function(player)
+		local base = BaseService.Get(player)
+		local char = player.Character
+		local hrp = char and char:FindFirstChild("HumanoidRootPart")
+		if not base or not hrp or not BaseService.IsInside(base, hrp.Position) then
+			return false, "Go to the 💰 pad in your base to collect!"
+		end
+		BaseService.Collect(player)
+		return true
 	end)
 
 	-- Lock expiry, alarm flashing and sign updates
@@ -622,6 +906,9 @@ function BaseService.Start()
 				end
 				if not alarming and base.Siren.IsPlaying then
 					base.Siren:Stop()
+				end
+				if owner and tick % 2 == 0 then
+					BaseService.SecurityTick(base, owner)
 				end
 			end
 		end

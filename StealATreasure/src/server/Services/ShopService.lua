@@ -5,6 +5,7 @@ local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local UpgradeData = require(Shared.UpgradeData)
 local Remotes = require(Shared.Remotes)
 local Util = require(Shared.Util)
+local Config = require(Shared.Config)
 
 local S
 
@@ -38,12 +39,59 @@ function ShopService.BuyUpgrade(player: Player, key: string)
 		S.PlayerService.ApplyMovement(player)
 	elseif key == "Base" then
 		S.BaseService.Refresh(player)
-	elseif key == "Protection" then
+	elseif key == "Protection" or key == "Walls" then
 		S.BaseService.RefreshPrompts(player)
+		S.BaseService.Refresh(player)
+	elseif key == "Security" or key == "Floors" then
+		S.BaseService.Refresh(player)
 	end
 	Remotes.Effect:FireClient(player, "Purchase")
 	S.StateService.MarkFull(player)
 	return true, ("%s upgraded to level %d!"):format(up.Name, level + 1)
+end
+
+function ShopService.BuyGemItem(player: Player, key)
+	local data = S.DataService.Get(player)
+	if not data or typeof(key) ~= "string" then
+		return false, "Bad request"
+	end
+	local item = UpgradeData.GemShop[key]
+	if not item then
+		return false, "Unknown item"
+	end
+	local cost = item.Cost
+	if key == "PetSlot" then
+		if UpgradeData.PetSlots(data) >= Config.Pets.MaxSlots then
+			return false, "Max pet slots reached!"
+		end
+		cost = item.Cost * (data.ExtraPetSlots + 1)
+	elseif key == "AutoCollect" and data.AutoCollect then
+		return false, "You already own the Auto Collector"
+	end
+	if data.Gems < cost then
+		return false, ("Need %d more 💎"):format(cost - data.Gems)
+	end
+	data.Gems -= cost
+	if item.Boost then
+		data.Boosts[item.Boost] = math.max(os.time(), data.Boosts[item.Boost] or 0) + item.Duration
+		if item.Boost == "Speed" then
+			S.PlayerService.ApplyMovement(player)
+			task.delay(item.Duration + 1, function()
+				if player.Parent then
+					S.PlayerService.ApplyMovement(player)
+				end
+			end)
+		end
+	elseif key == "AutoCollect" then
+		data.AutoCollect = true
+		S.BaseService.Collect(player)
+	elseif key == "PetSlot" then
+		data.ExtraPetSlots += 1
+		S.PetService.Refresh(player)
+	end
+	Remotes.Effect:FireClient(player, "Purchase")
+	S.StateService.MarkFull(player)
+	return true, ("Bought %s!"):format(item.Name)
 end
 
 function ShopService.BuyAbility(player: Player, key: string)
@@ -157,6 +205,7 @@ function ShopService.Start()
 	S.NetService.Handle("BuyUpgrade", ShopService.BuyUpgrade)
 	S.NetService.Handle("BuyAbility", ShopService.BuyAbility)
 	S.NetService.Handle("UseAbility", ShopService.UseAbility)
+	S.NetService.Handle("BuyGemItem", ShopService.BuyGemItem)
 end
 
 return ShopService

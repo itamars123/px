@@ -127,6 +127,8 @@ function StealService.Return(item, reason: string?)
 	S.BaseService.Refresh(owner)
 	if reason == "bonked" then
 		S.NetService.Notify(owner, "Your treasure was recovered! 🛡️", "success")
+	elseif reason == "trapped" then
+		-- notification sent by the security system
 	elseif reason == "timeout" or reason == "dropped" then
 		S.NetService.Notify(owner, "Your stolen treasure returned home.", "info")
 	end
@@ -165,6 +167,7 @@ function StealService.Complete(thief: Player, item)
 
 	S.TreasureService.Give(thief, item.Id, { Source = "Steal" })
 	S.EconomyService.AddXP(thief, Config.XP.Steal)
+	S.PlayerService.Emote(thief, "Victory", 4)
 
 	-- victim's base locks down for a while (fair cooldown)
 	S.BaseService.SetLock(owner, UpgradeData.VictimLock(oData))

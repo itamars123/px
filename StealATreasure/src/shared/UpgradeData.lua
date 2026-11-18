@@ -47,6 +47,46 @@ UpgradeData.Upgrades = {
 			return math.floor(800 * 2.6 ^ level)
 		end,
 	},
+	Luck = {
+		Order = 6,
+		Name = "Four-Leaf Charm",
+		Icon = "🍀",
+		Description = "+10% luck: better egg hatches and a chance to upgrade treasures you pick up.",
+		MaxLevel = 10,
+		Cost = function(level)
+			return math.floor(2500 * 2.8 ^ level)
+		end,
+	},
+	Security = {
+		Order = 7,
+		Name = "Security Cameras & Traps",
+		Icon = "📷",
+		Description = "Cameras warn you about intruders. +7% chance per level to zap thieves escaping with your loot.",
+		MaxLevel = 8,
+		Cost = function(level)
+			return math.floor(3000 * 3 ^ level)
+		end,
+	},
+	Walls = {
+		Order = 8,
+		Name = "Reinforced Walls",
+		Icon = "🧱",
+		Description = "Upgrade your wall material (Wood → Diamond). Each tier makes stealing take longer.",
+		MaxLevel = 7,
+		Cost = function(level)
+			return math.floor(1200 * 3.4 ^ level)
+		end,
+	},
+	Floors = {
+		Order = 9,
+		Name = "Second Floor",
+		Icon = "🏢",
+		Description = "Build a second floor with stairs and 12 more display stands.",
+		MaxLevel = 1,
+		Cost = function()
+			return 750000
+		end,
+	},
 	Income = {
 		Order = 5,
 		Name = "Golden Vault",
@@ -102,6 +142,35 @@ UpgradeData.Abilities = {
 	},
 }
 
+-- Gem shop: boosts and permanent perks bought with gems.
+UpgradeData.GemShop = {
+	MoneyBoost = { Order = 1, Name = "2x Money (15 min)", Icon = "💸", Cost = 100, Boost = "Money", Duration = 900, Description = "Double all income for 15 minutes." },
+	LuckBoost = { Order = 2, Name = "2x Luck (15 min)", Icon = "🍀", Cost = 80, Boost = "Luck", Duration = 900, Description = "+100% luck for 15 minutes." },
+	SpeedBoost = { Order = 3, Name = "Speed Potion (10 min)", Icon = "⚡", Cost = 50, Boost = "Speed", Duration = 600, Description = "+8 walk speed for 10 minutes." },
+	AutoCollect = { Order = 4, Name = "Auto Collector", Icon = "🤖", Cost = 400, Permanent = true, Description = "Income goes straight to your wallet. No more collecting!" },
+	PetSlot = { Order = 5, Name = "+1 Pet Slot", Icon = "🐾", Cost = 250, Description = "Equip one more pet (max 6)." },
+}
+
+-- Base colour palette for personalisation
+UpgradeData.BaseColors = {
+	Color3.fromRGB(255, 95, 95), Color3.fromRGB(255, 170, 60), Color3.fromRGB(250, 220, 70),
+	Color3.fromRGB(100, 220, 110), Color3.fromRGB(70, 200, 255), Color3.fromRGB(120, 120, 255),
+	Color3.fromRGB(200, 110, 255), Color3.fromRGB(255, 110, 200), Color3.fromRGB(60, 60, 75),
+	Color3.fromRGB(245, 245, 250), Color3.fromRGB(40, 200, 170), Color3.fromRGB(150, 90, 50),
+}
+
+-- Wall tiers (index = Walls upgrade level + 1)
+UpgradeData.WallTiers = {
+	{ Name = "Wood", Material = "WoodPlanks" },
+	{ Name = "Brick", Material = "Brick" },
+	{ Name = "Stone", Material = "Cobblestone" },
+	{ Name = "Slate", Material = "Slate" },
+	{ Name = "Steel", Material = "DiamondPlate" },
+	{ Name = "Marble", Material = "Marble" },
+	{ Name = "Gold", Material = "Foil" },
+	{ Name = "Diamond", Material = "Glass" },
+}
+
 function UpgradeData.SortedKeys(tbl)
 	local keys = {}
 	for k in pairs(tbl) do
@@ -114,9 +183,32 @@ function UpgradeData.SortedKeys(tbl)
 end
 
 -- Derived stats ------------------------------------------------------------
-function UpgradeData.WalkSpeed(data)
+local function boostActive(data, name)
+	return data.Boosts and (data.Boosts[name] or 0) > os.time()
+end
+UpgradeData.BoostActive = boostActive
+
+function UpgradeData.WalkSpeed(data, petSpeed: number?)
 	local rebirthBonus = math.min(Config.Rebirth.MaxSpeedBonus, (data.Rebirths or 0) * Config.Rebirth.SpeedBonusPerRebirth)
-	return Config.BaseWalkSpeed + (data.Upgrades.Speed or 0) * 2 + rebirthBonus
+	local boost = boostActive(data, "Speed") and 8 or 0
+	return Config.BaseWalkSpeed + (data.Upgrades.Speed or 0) * 2 + rebirthBonus + boost + (petSpeed or 0)
+end
+
+-- Luck multiplier (1 = normal). eventBonus/petBonus are additive (+0.5 = +50%).
+function UpgradeData.Luck(data, petBonus: number?, eventBonus: number?)
+	local l = 1 + (data.Upgrades.Luck or 0) * Config.Luck.PerUpgrade
+	if boostActive(data, "Luck") then
+		l += 1
+	end
+	return l + (petBonus or 0) + (eventBonus or 0)
+end
+
+function UpgradeData.WallTier(data)
+	return UpgradeData.WallTiers[math.clamp((data.Upgrades.Walls or 0) + 1, 1, #UpgradeData.WallTiers)]
+end
+
+function UpgradeData.PetSlots(data)
+	return math.min(Config.Pets.MaxSlots, Config.Pets.StartSlots + (data.ExtraPetSlots or 0))
 end
 
 function UpgradeData.CarryCapacity(data)
@@ -129,7 +221,8 @@ end
 
 function UpgradeData.PlotCount(data)
 	local total = Config.PlotColumns * Config.PlotRows
-	return math.min(total, Config.StartingPlots + (UpgradeData.BaseLevel(data) - 1) * Config.PlotsPerBaseLevel)
+	local ground = math.min(total, Config.StartingPlots + (UpgradeData.BaseLevel(data) - 1) * Config.PlotsPerBaseLevel)
+	return ground + ((data.Upgrades.Floors or 0) > 0 and Config.SecondFloorPlots or 0)
 end
 
 function UpgradeData.LockDuration(data)
@@ -141,18 +234,22 @@ function UpgradeData.LockCooldown(data)
 end
 
 function UpgradeData.StealHold(data)
-	return Config.Steal.BaseHoldDuration + (data.Upgrades.Protection or 0) * Config.Steal.HoldPerProtectionLevel
+	return Config.Steal.BaseHoldDuration + (data.Upgrades.Protection or 0) * Config.Steal.HoldPerProtectionLevel + (data.Upgrades.Walls or 0) * Config.Security.WallHoldBonus
 end
 
 function UpgradeData.VictimLock(data)
 	return Config.Steal.VictimAutoLock + (data.Upgrades.Protection or 0) * Config.Steal.VictimAutoLockPerLevel
 end
 
-function UpgradeData.IncomeMultiplier(data)
-	local m = 1
+-- auraBonus: summed Aura of placed treasures. petBonus: summed pet income bonus.
+function UpgradeData.IncomeMultiplier(data, auraBonus: number?, petBonus: number?)
+	local m = 1 + (auraBonus or 0) + (petBonus or 0)
 	m += (data.Rebirths or 0) * Config.Rebirth.IncomeBonusPerRebirth
 	m += (data.Upgrades.Income or 0) * 0.10
 	m += (UpgradeData.BaseLevel(data) - 1) * 0.05
+	if boostActive(data, "Money") then
+		m *= 2
+	end
 	return m
 end
 

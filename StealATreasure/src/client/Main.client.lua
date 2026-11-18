@@ -13,6 +13,11 @@ local State = require(Controllers.State)
 local Sound = require(Controllers.Sound)
 local WorldFX = require(Controllers.WorldFX)
 local Input = require(Controllers.Input)
+local Emotes = require(Controllers.Emotes)
+local PetFollower = require(Controllers.PetFollower)
+local Ambience = require(Controllers.Ambience)
+local Music = require(Controllers.Music)
+local Cinematic = require(Controllers.Cinematic)
 
 local Lib = require(UI.Lib)
 local Windows = require(UI.Windows)
@@ -55,7 +60,10 @@ HUD.Init(gui)
 
 Windows.Register("Inventory", require(UI.InventoryWindow), { Title = "Inventory", Icon = "🎒", Color = Lib.Theme.Blue })
 Windows.Register("Index", require(UI.IndexWindow), { Title = "Treasure Index", Icon = "📖", Color = Lib.Theme.Purple })
-Windows.Register("Shop", require(UI.ShopWindow), { Title = "Upgrade Shop", Icon = "🛒", Color = Lib.Theme.Green })
+Windows.Register("Shop", require(UI.ShopWindow), { Title = "Upgrades & Abilities", Icon = "🛒", Color = Lib.Theme.Green })
+Windows.Register("GemShop", require(UI.GemShopWindow), { Title = "Gem Shop & Base Style", Icon = "💎", Color = Lib.Theme.Blue })
+Windows.Register("Pets", require(UI.PetsWindow), { Title = "Pets", Icon = "🐾", Color = Lib.Theme.Orange })
+Windows.Register("Achievements", require(UI.AchievementsWindow), { Title = "Achievements", Icon = "🎖️", Color = Lib.Theme.Accent })
 Windows.Register("Rebirth", require(UI.RebirthWindow), { Title = "Rebirth", Icon = "🌀", Color = Lib.Theme.Pink })
 Windows.Register("Leaderboard", require(UI.LeaderboardWindow), { Title = "Leaderboards", Icon = "🏆", Color = Lib.Theme.Accent })
 Windows.Register("Settings", require(UI.SettingsWindow), { Title = "Settings", Icon = "⚙️", Color = Lib.Theme.Panel2, Size = UDim2.fromScale(0.6, 0.8), MaxSize = Vector2.new(700, 620) })
@@ -63,14 +71,39 @@ Windows.Register("Trade", require(UI.TradeWindow), { Title = "Trading", Icon = "
 
 WorldFX.Init(Windows, Notifications)
 WorldFX.Start()
-Input.Init(Windows)
+Emotes.Start()
+PetFollower.Start()
+Ambience.Start()
+Music.Start()
+Cinematic.Start()
+Input.Init(Windows, HUD)
 
-State.FullChanged.Event:Connect(function(full)
+local function applySettings(full)
 	local s = full.Settings or {}
 	userScale = s.UIScale or 1
 	rescale()
 	Sound.SetSettings(s)
 	WorldFX.SetSettings(s)
+	Ambience.SetSettings(s)
+	Music.SetEnabled(s.Music ~= false)
+	PetFollower.LowGfx = s.LowGfx == true
+end
+State.FullChanged.Event:Connect(applySettings)
+if State.Full then
+	applySettings(State.Full)
+end
+
+-- Cinematic intro on the first state (once per join)
+local introDone = false
+State.FullChanged.Event:Connect(function(full)
+	if introDone then
+		return
+	end
+	introDone = true
+	if (full.Settings or {}).Intro ~= false then
+		task.wait(1)
+		Cinematic.PlayIntro(gui)
+	end
 end)
 
 -- Welcome

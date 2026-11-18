@@ -34,7 +34,14 @@ local function view(trade, player: Player)
 				table.insert(items, { Uid = uid, Id = t.Id })
 			end
 		end
-		return { Items = items, Money = trade.Offers[p].Money, Ready = trade.Ready[p] }
+		local pets = {}
+		for _, uid in ipairs(trade.Offers[p].Pets) do
+			local pet = data and data.Pets[uid]
+			if pet then
+				table.insert(pets, { Uid = uid, Id = pet.Id })
+			end
+		end
+		return { Items = items, Pets = pets, Money = trade.Offers[p].Money, Ready = trade.Ready[p] }
 	end
 	return {
 		Id = trade.Id,
@@ -100,6 +107,18 @@ local function validateSide(trade, giver: Player, receiver: Player)
 			return false, "An offered treasure is being stolen!"
 		end
 	end
+	for _, uid in ipairs(offer.Pets) do
+		if not gData.Pets[uid] then
+			return false, "An offered pet no longer exists"
+		end
+	end
+	local petCount = 0
+	for _ in pairs(rData.Pets) do
+		petCount += 1
+	end
+	if petCount - #trade.Offers[receiver].Pets + #offer.Pets > Config.Pets.MaxOwned then
+		return false, receiver.DisplayName .. " has too many pets"
+	end
 	if gData.Money < offer.Money then
 		return false, giver.DisplayName .. " doesn't have enough money"
 	end
@@ -127,15 +146,27 @@ local function execute(trade)
 	local aData, bData = S.DataService.Get(trade.A), S.DataService.Get(trade.B)
 	-- remove from both first, then add (so capacity checks above hold)
 	local moving = { [trade.A] = {}, [trade.B] = {} }
+	local movingPets = { [trade.A] = {}, [trade.B] = {} }
 	for _, pair in ipairs({ { trade.A, aData }, { trade.B, bData } }) do
 		local p, data = pair[1], pair[2]
 		for _, uid in ipairs(trade.Offers[p].Uids) do
 			table.insert(moving[p], data.Treasures[uid].Id)
 			data.Treasures[uid] = nil
 		end
+		for _, uid in ipairs(trade.Offers[p].Pets) do
+			table.insert(movingPets[p], data.Pets[uid].Id)
+			data.Pets[uid] = nil
+		end
 		data.Money -= trade.Offers[p].Money
 	end
-	local function receive(p: Player, data, ids, money)
+	local function receive(p: Player, data, ids, money, petIds)
+		for _, id in ipairs(petIds) do
+			local uid = Util.NewUid()
+			while data.Pets[uid] do
+				uid = Util.NewUid()
+			end
+			data.Pets[uid] = { Id = id, Equipped = false }
+		end
 		for _, id in ipairs(ids) do
 			local uid = Util.NewUid()
 			while data.Treasures[uid] do
@@ -147,11 +178,12 @@ local function execute(trade)
 		data.Money += money
 		data.Stats.Trades += 1
 	end
-	receive(trade.A, aData, moving[trade.B], trade.Offers[trade.B].Money)
-	receive(trade.B, bData, moving[trade.A], trade.Offers[trade.A].Money)
+	receive(trade.A, aData, moving[trade.B], trade.Offers[trade.B].Money, movingPets[trade.B])
+	receive(trade.B, bData, moving[trade.A], trade.Offers[trade.A].Money, movingPets[trade.A])
 
 	for _, p in ipairs({ trade.A, trade.B }) do
 		S.BaseService.Refresh(p)
+		S.PetService.Refresh(p)
 		task.spawn(S.DataService.Save, p, false)
 		S.NetService.Notify(p, "🤝 Trade complete! New treasures are in your storage.", "success")
 		Remotes.Effect:FireClient(p, "Confetti")
@@ -165,13 +197,13 @@ local function start(a: Player, b: Player)
 		Id = nextId,
 		A = a,
 		B = b,
-		Offers = { [a] = { Uids = {}, Money = 0 }, [b] = { Uids = {}, Money = 0 } },
+		Offers = { [a] = { Uids = {}, Money = 0, Pets = {} }, [b] = { Uids = {}, Money = 0, Pets = {} } },
 		Ready = { [a] = false, [b] = false },
 		Status = "Open",
 		CountdownEnd = 0,
 	}
-	S.DataService.Session(a).Trade = { Ref = trade, MyOffer = trade.Offers[a].Uids }
-	S.DataService.Session(b).Trade = { Ref = trade, MyOffer = trade.Offers[b].Uids }
+	S.DataService.Session(a).Trade = { Ref = trade, MyOffer = trade.Offers[a].Uids, MyPets = trade.Offers[a].Pets }
+	S.DataService.Session(b).Trade = { Ref = trade, MyOffer = trade.Offers[b].Uids, MyPets = trade.Offers[b].Pets }
 	broadcast(trade)
 end
 
@@ -243,7 +275,7 @@ local function onRespond(player: Player, fromUserId, accept)
 	return true
 end
 
-local function onOffer(player: Player, uids, money)
+local function onOffer(player: Player, uids, money, petUids)
 	local trade = tradeOf(player)
 	if not trade or trade.Status == "Closed" then
 		return false, "No active trade"
@@ -263,6 +295,28 @@ local function onOffer(player: Player, uids, money)
 				break
 			end
 		end
+	end
+	local cleanPets = {}
+	local petsChanged = false
+	if typeof(petUids) == "table" then
+		for _, uid in ipairs(petUids) do
+			if typeof(uid) == "string" and not seen[uid] and data.Pets[uid] then
+				seen[uid] = true
+				table.insert(cleanPets, uid)
+				if data.Pets[uid].Equipped then
+					data.Pets[uid].Equipped = false -- offered pets stop following
+					petsChanged = true
+				end
+				if #cleanPets >= Config.Trade.MaxItems then
+					break
+				end
+			end
+		end
+	end
+	trade.Offers[player].Pets = cleanPets
+	ses.Trade.MyPets = cleanPets
+	if petsChanged then
+		S.PetService.Refresh(player)
 	end
 	local m = (typeof(money) == "number" and money == money) and math.floor(math.clamp(money, 0, data.Money)) or 0
 	trade.Offers[player].Uids = clean

@@ -126,6 +126,14 @@ local RAW = {
 		"Eternal Hourglass|Hourglass|fff0c0|80e0ff|Foil|Rainbow",
 		"Prism Diamond|Gem|ffffff|ff80c0|Glass|Rainbow",
 	},
+	Celestial = {
+		"Star Forge|Star|80d0ff|ffffff|Neon|Stars",
+		"Astral Chalice|Chalice|c0a0ff|80ffff|Glass|Stars",
+		"Comet Crown|Crown|a0e0ff|ffffff|Foil|Stars",
+		"Nova Heart|Heart|60c0ff|ffffff|Neon|Lightning",
+		"Galaxy Orb|Orb|3020a0|80e0ff|Glass|Rainbow",
+		"Constellation Blade|Sword|1a1a40|80e0ff|Neon|Stars",
+	},
 }
 
 -- Rebirth-exclusive treasures (never spawn in the world)
@@ -145,6 +153,7 @@ local MPS_RANGE = {
 	Mythical = { 9000, 30000 },
 	Secret = { 60000, 200000 },
 	Divine = { 450000, 1500000 },
+	Celestial = { 4000000, 12000000 },
 }
 
 local PRICE_FACTOR = {
@@ -156,6 +165,7 @@ local PRICE_FACTOR = {
 	Mythical = 50,
 	Secret = 55,
 	Divine = 60,
+	Celestial = 65,
 }
 
 local SHAPE_ICONS = {
@@ -186,6 +196,18 @@ local SHAPE_ICONS = {
 	Feather = "🪶",
 }
 
+-- Idle "personality" animations the client plays for each treasure.
+local PERSONALITIES = { "Hop", "Dance", "Float", "Spin", "Wiggle", "Bounce" }
+
+-- Mythical+ treasures have an Aura ability: +X% income for the whole base.
+local AURA = { Mythical = 0.02, Secret = 0.04, Divine = 0.06, Celestial = 0.10 }
+local ABILITY_NAMES = {
+	Mythical = "Lucky Aura",
+	Secret = "Shadow Aura",
+	Divine = "Holy Aura",
+	Celestial = "Cosmic Aura",
+}
+
 local function niceRound(n: number): number
 	if n < 10 then
 		return math.floor(n + 0.5)
@@ -211,6 +233,7 @@ local function parse(row: string)
 end
 
 local TreasureData = {}
+TreasureData.Personalities = PERSONALITIES
 TreasureData.ById = {} :: { [string]: any }
 TreasureData.ByName = {} :: { [string]: any }
 TreasureData.List = {} :: { any }
@@ -219,6 +242,9 @@ TreasureData.ShapeIcons = SHAPE_ICONS
 
 local function register(def)
 	def.Id = slug(def.Name)
+	def.Personality = PERSONALITIES[(#def.Name + #def.Shape) % #PERSONALITIES + 1]
+	def.Aura = AURA[def.Rarity] or 0
+	def.Ability = ABILITY_NAMES[def.Rarity]
 	def.Icon = SHAPE_ICONS[def.Shape] or "✨"
 	assert(TreasureData.ById[def.Id] == nil, "Duplicate treasure id " .. def.Id)
 	TreasureData.ById[def.Id] = def

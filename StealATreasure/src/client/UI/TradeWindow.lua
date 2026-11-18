@@ -6,9 +6,11 @@ local Players = game:GetService("Players")
 
 local Lib = require(script.Parent.Lib)
 local Inventory = require(script.Parent.InventoryWindow)
+local PetsWindow = require(script.Parent.PetsWindow)
 local State = require(script.Parent.Parent.Controllers.State)
 local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local TreasureData = require(Shared.TreasureData)
+local PetData = require(Shared.PetData)
 local Remotes = require(Shared.Remotes)
 local Config = require(Shared.Config)
 local Util = require(Shared.Util)
@@ -46,9 +48,19 @@ local function offerUids(): { string }
 	return list
 end
 
-local function sendOffer(uids)
+local function offerPets(): { string }
+	local list = {}
+	if trade then
+		for _, p in ipairs(trade.Mine.Pets or {}) do
+			table.insert(list, p.Uid)
+		end
+	end
+	return list
+end
+
+local function sendOffer(uids, pets)
 	local money = tonumber(myMoney.Text) or 0
-	State.Request("TradeOffer", uids, money)
+	State.Request("TradeOffer", uids, money, pets or offerPets())
 end
 
 local function refreshLobby()
@@ -85,8 +97,25 @@ local function refreshLobby()
 	end
 end
 
-local function fillItems(container: ScrollingFrame, items, clickable: boolean)
+local function fillItems(container: ScrollingFrame, items, clickable: boolean, pets)
 	Lib.clear(container)
+	for i, pet in ipairs(pets or {}) do
+		local def = PetData.Get(pet.Id)
+		if def then
+			local card = PetsWindow.Card(def, { Order = 100 + i, Sub = clickable and "tap to remove" or nil })
+			if clickable then
+				card.Activated:Connect(function()
+					local list = offerPets()
+					local idx = table.find(list, pet.Uid)
+					if idx then
+						table.remove(list, idx)
+					end
+					sendOffer(offerUids(), list)
+				end)
+			end
+			card.Parent = container
+		end
+	end
 	for i, item in ipairs(items) do
 		local def = TreasureData.Get(item.Id)
 		if def then
@@ -140,6 +169,26 @@ local function refreshPicker()
 		end)
 		card.Parent = picker
 	end
+	-- pets
+	local offeredPets = {}
+	for _, uid in ipairs(offerPets()) do
+		offeredPets[uid] = true
+	end
+	for i, p in ipairs(full.Pets or {}) do
+		local def = PetData.Get(p.Id)
+		if def and not offeredPets[p.Uid] then
+			local card = PetsWindow.Card(def, { Order = 1000 + i, Badge = p.Equipped and "✅" or nil })
+			card.Activated:Connect(function()
+				local list = offerPets()
+				if #list >= Config.Trade.MaxItems then
+					return
+				end
+				table.insert(list, p.Uid)
+				sendOffer(offerUids(), list)
+			end)
+			card.Parent = picker
+		end
+	end
 end
 
 local function refreshSession()
@@ -147,8 +196,8 @@ local function refreshSession()
 		return
 	end
 	partnerLabel.Text = "Trading with " .. trade.Partner.Name
-	fillItems(myOffer, trade.Mine.Items, true)
-	fillItems(theirOffer, trade.Theirs.Items, false)
+	fillItems(myOffer, trade.Mine.Items, true, trade.Mine.Pets)
+	fillItems(theirOffer, trade.Theirs.Items, false, trade.Theirs.Pets)
 	theirMoney.Text = "💰 " .. Util.Money(trade.Theirs.Money)
 	if not myMoney:IsFocused() then
 		myMoney.Text = tostring(trade.Mine.Money)
@@ -226,7 +275,7 @@ function Trade.Build(content: Frame, windows)
 
 	local pick = Lib.panel({ Position = UDim2.new(0, 0, 0.5, 6), Size = UDim2.new(1, 0, 0.5, -60), Parent = session })
 	Lib.padding(6).Parent = pick
-	Lib.label({ Size = UDim2.new(1, 0, 0, 20), Text = "Tap your treasures to add them (max " .. Config.Trade.MaxItems .. ")", TextColor3 = T.SubText, MaxText = 15, Parent = pick })
+	Lib.label({ Size = UDim2.new(1, 0, 0, 20), Text = "Tap treasures or pets to add them (max " .. Config.Trade.MaxItems .. " each)", TextColor3 = T.SubText, MaxText = 15, Parent = pick })
 	picker = itemGrid(pick, UDim2.fromOffset(0, 24), UDim2.new(1, 0, 1, -24))
 
 	local buttons = new("Frame", { BackgroundTransparency = 1, Position = UDim2.new(0, 0, 1, -48), Size = UDim2.new(1, 0, 0, 46), Parent = session }, {

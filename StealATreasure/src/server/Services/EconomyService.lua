@@ -15,6 +15,29 @@ local S
 
 local EconomyService = {}
 EconomyService.EventMultiplier = 1
+EconomyService.EventLuck = 0 -- additive luck bonus from the Lucky Treasure event
+
+function EconomyService.AddGems(player: Player, amount: number)
+	local data = S.DataService.Get(player)
+	local session = S.DataService.Session(player)
+	if not data or amount ~= amount or amount == 0 then
+		return
+	end
+	if amount > 0 and session then
+		amount = math.floor(amount * (1 + session.PetBonus.Gems) + 0.5)
+	end
+	data.Gems = math.max(0, math.floor(data.Gems + amount))
+	S.StateService.PushStats(player)
+end
+
+function EconomyService.Luck(player: Player): number
+	local data = S.DataService.Get(player)
+	local session = S.DataService.Session(player)
+	if not data then
+		return 1
+	end
+	return UpgradeData.Luck(data, session and session.PetBonus.Luck or 0, EconomyService.EventLuck)
+end
 
 function EconomyService.AddMoney(player: Player, amount: number)
 	local data = S.DataService.Get(player)
@@ -42,10 +65,12 @@ function EconomyService.AddXP(player: Player, amount: number)
 		-- level reward
 		local reward = 100 * data.Level * data.Level
 		data.Money += reward
-		S.NetService.Notify(player, ("⭐ LEVEL %d! +%s"):format(data.Level, Util.Money(reward)), "level")
+		data.Gems += data.Level * Config.Gems.PerLevel
+		S.NetService.Notify(player, ("⭐ LEVEL %d! +%s  +%d 💎"):format(data.Level, Util.Money(reward), data.Level * Config.Gems.PerLevel), "level")
 	end
 	if leveled then
 		Remotes.Effect:FireClient(player, "LevelUp", data.Level)
+		S.PlayerService.Emote(player, "Celebrate", 3)
 		S.PlayerService.UpdateOverhead(player)
 	end
 	S.StateService.PushStats(player)
@@ -58,16 +83,18 @@ function EconomyService.ComputeMPS(player: Player): number
 	if not data or not session then
 		return 0
 	end
-	local total = 0
+	local total, aura = 0, 0
 	for uid, t in pairs(data.Treasures) do
 		if t.Plot and not session.Stealing[uid] then
 			local def = TreasureData.Get(t.Id)
 			if def then
 				total += def.MPS
+				aura += def.Aura or 0
 			end
 		end
 	end
-	return total * UpgradeData.IncomeMultiplier(data) * EconomyService.EventMultiplier
+	session.Aura = aura
+	return total * UpgradeData.IncomeMultiplier(data, aura, session.PetBonus.Money) * EconomyService.EventMultiplier
 end
 
 function EconomyService.GrantOffline(player: Player)
@@ -89,8 +116,8 @@ function EconomyService.GrantOffline(player: Player)
 	mps *= UpgradeData.IncomeMultiplier(data)
 	local earned = math.floor(mps * away * Config.OfflineIncomeRate)
 	if earned > 0 then
-		EconomyService.AddMoney(player, earned)
-		S.NetService.Notify(player, ("💤 Welcome back! Your treasures earned %s while you were away (%s)."):format(Util.Money(earned), Util.Time(away)), "discovery")
+		data.Vault = (data.Vault or 0) + earned
+		S.NetService.Notify(player, ("💤 Welcome back! Your treasures earned %s while you were away (%s). Collect it at your base!"):format(Util.Money(earned), Util.Time(away)), "discovery")
 	end
 end
 
@@ -110,7 +137,11 @@ function EconomyService.Start()
 					session.MPS = mps
 					local gain = mps * Config.IncomeTickSeconds
 					if gain > 0 then
-						data.Money += gain
+						if data.AutoCollect then
+							data.Money += gain
+						else
+							data.Vault = (data.Vault or 0) + gain
+						end
 						data.TotalEarned += gain
 					end
 					S.StateService.PushStats(player)

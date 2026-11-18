@@ -46,6 +46,14 @@ local function buildFull(player: Player)
 			InTrade = table.find(tradeOffer, uid) ~= nil,
 		})
 	end
+	local pets = {}
+	for uid, pet in pairs(data.Pets) do
+		table.insert(pets, { Uid = uid, Id = pet.Id, Equipped = pet.Equipped, InTrade = session.Trade ~= nil and table.find(session.Trade.MyPets or {}, uid) ~= nil })
+	end
+	local achievements = {}
+	for id in pairs(data.Achievements) do
+		table.insert(achievements, id)
+	end
 	local index = {}
 	for id in pairs(data.Index) do
 		table.insert(index, id)
@@ -56,6 +64,19 @@ local function buildFull(player: Player)
 	end
 	return {
 		Money = data.Money,
+		Gems = data.Gems,
+		Vault = data.Vault,
+		Pets = pets,
+		PetSlots = UpgradeData.PetSlots(data),
+		Achievements = achievements,
+		AchievementProgress = S.AchievementService.Progress(data),
+		Boosts = data.Boosts,
+		AutoCollect = data.AutoCollect,
+		BaseColor = data.BaseColor,
+		ExtraPetSlots = data.ExtraPetSlots,
+		PetBonus = session.PetBonus,
+		Aura = session.Aura,
+		Luck = S.EconomyService.Luck(player),
 		TotalEarned = data.TotalEarned,
 		Rebirths = data.Rebirths,
 		Level = data.Level,
@@ -74,7 +95,7 @@ local function buildFull(player: Player)
 		CarryCap = UpgradeData.CarryCapacity(data),
 		MaxStorage = Config.MaxStorage,
 		BaseIndex = session.BaseIndex,
-		Multiplier = UpgradeData.IncomeMultiplier(data),
+		Multiplier = UpgradeData.IncomeMultiplier(data, session.Aura, session.PetBonus.Money),
 		RebirthCost = Config.RebirthCost(data.Rebirths),
 		LockDuration = UpgradeData.LockDuration(data),
 		CanSave = S.DataService.CanSave(),
@@ -93,6 +114,13 @@ local function buildStats(player: Player)
 	end
 	return {
 		Money = data.Money,
+		Gems = data.Gems,
+		Vault = data.Vault,
+		Stamina = session.Stamina,
+		MaxStamina = Config.Sprint.MaxStamina,
+		Luck = S.EconomyService.Luck(player),
+		Boosts = data.Boosts,
+		ServerTime = os.time(),
 		MPS = session.MPS,
 		Level = data.Level,
 		XP = data.XP,

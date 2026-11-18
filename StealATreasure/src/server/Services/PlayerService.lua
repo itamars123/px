@@ -21,13 +21,27 @@ function PlayerService.ApplyMovement(player: Player)
 	if not data or not session or not hum then
 		return
 	end
-	local speed = UpgradeData.WalkSpeed(data)
+	local speed = UpgradeData.WalkSpeed(data, session.PetBonus and session.PetBonus.Speed or 0)
 	if #session.Carrying > 0 then
 		speed *= S.CarryService.IsCarryingStolen(player) and 0.85 or 0.95
+	end
+	if session.Sprinting and session.Stamina > 0 then
+		speed *= Config.Sprint.Multiplier
 	end
 	hum.WalkSpeed = speed
 	hum.UseJumpPower = true
 	hum.JumpPower = session.SuperJump and 115 or Config.BaseJumpPower
+end
+
+-- Emotes: the server sets an attribute, every client animates it procedurally.
+local EMOTES = { Dance = 6, Wave = 3, Cheer = 3, Victory = 5, Celebrate = 3, Flex = 3 }
+function PlayerService.Emote(player: Player, name: string, duration: number?)
+	local char = player.Character
+	if not char or not EMOTES[name] then
+		return
+	end
+	char:SetAttribute("Emote", name)
+	char:SetAttribute("EmoteEnd", workspace:GetServerTimeNow() + (duration or EMOTES[name]))
 end
 
 function PlayerService.UpdateOverhead(player: Player)
@@ -140,6 +154,7 @@ local function setupCharacter(player: Player, char: Model)
 	if session then
 		session.Cloaked = false
 		session.SuperJump = false
+		session.Sprinting = false
 	end
 	task.defer(function()
 		local cf = S.BaseService.SpawnCFrame(player)
@@ -181,9 +196,8 @@ local function onLoaded(player: Player)
 		return
 	end
 	-- treasures on now-locked plots (data from older versions) go to storage
-	local plots = UpgradeData.PlotCount(data)
 	for _, t in pairs(data.Treasures) do
-		if t.Plot and (t.Plot > plots or t.Plot < 1) then
+		if t.Plot and not S.BaseService.IsPlotUnlocked(data, t.Plot) then
 			t.Plot = nil
 		end
 	end
@@ -221,7 +235,7 @@ function PlayerService.Start()
 		if not data or typeof(settings) ~= "table" then
 			return false, "Bad request"
 		end
-		for _, key in ipairs({ "Music", "Sfx", "LowGfx", "Effects" }) do
+		for _, key in ipairs({ "Music", "Sfx", "LowGfx", "Effects", "Weather", "Intro" }) do
 			if typeof(settings[key]) == "boolean" then
 				data.Settings[key] = settings[key]
 			end
@@ -231,6 +245,69 @@ function PlayerService.Start()
 		end
 		S.StateService.MarkFull(player)
 		return true
+	end)
+
+	local emoteCooldown = {}
+	S.NetService.Handle("Emote", function(player, name)
+		if typeof(name) ~= "string" or not EMOTES[name] then
+			return false, "Unknown emote"
+		end
+		if emoteCooldown[player] and os.clock() - emoteCooldown[player] < 1 then
+			return false
+		end
+		emoteCooldown[player] = os.clock()
+		PlayerService.Emote(player, name)
+		return true
+	end)
+	S.NetService.Handle("Sprint", function(player, on)
+		local session = S.DataService.Session(player)
+		if not session then
+			return false
+		end
+		on = on == true
+		if on and session.Stamina < Config.Sprint.MinToStart then
+			return false, "Out of stamina!"
+		end
+		session.Sprinting = on
+		if player.Character then
+			player.Character:SetAttribute("Sprinting", on)
+		end
+		PlayerService.ApplyMovement(player)
+		return true
+	end)
+	S.NetService.Handle("SetStealing", function(player, on)
+		local char = player.Character
+		if char then
+			char:SetAttribute("Stealing", on == true)
+		end
+		return true
+	end)
+	-- stamina simulation
+	task.spawn(function()
+		local dt = 0.2
+		while true do
+			task.wait(dt)
+			for _, p in ipairs(Players:GetPlayers()) do
+				local ses = S.DataService.Session(p)
+				local hum = p.Character and p.Character:FindFirstChildOfClass("Humanoid")
+				if ses and hum then
+					local moving = hum.MoveDirection.Magnitude > 0.1
+					if ses.Sprinting and moving then
+						ses.Stamina = math.max(0, ses.Stamina - Config.Sprint.Drain * dt)
+						if ses.Stamina <= 0 then
+							ses.Sprinting = false
+							p.Character:SetAttribute("Sprinting", false)
+							PlayerService.ApplyMovement(p)
+						end
+					elseif not ses.Sprinting then
+						ses.Stamina = math.min(Config.Sprint.MaxStamina, ses.Stamina + Config.Sprint.Regen * dt)
+					end
+				end
+			end
+		end
+	end)
+	Players.PlayerRemoving:Connect(function(p)
+		emoteCooldown[p] = nil
 	end)
 
 	S.NetService.Handle("SetTitle", function(player, title)

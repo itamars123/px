@@ -10,7 +10,26 @@ local State = require(script.Parent.State)
 
 local Input = {}
 
-function Input.Init(windows)
+function Input.Init(windows, hud)
+	-- Sprint: hold Shift (PC) or toggle with L3 (gamepad); mobile uses the HUD button
+	ContextActionService:BindAction("Sprint", function(_, inputState, input)
+		if input.KeyCode == Enum.KeyCode.ButtonL3 then
+			if inputState == Enum.UserInputState.Begin then
+				hud.SetSprint(not (game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:GetAttribute("Sprinting")))
+			end
+		elseif inputState == Enum.UserInputState.Begin then
+			hud.SetSprint(true)
+		elseif inputState == Enum.UserInputState.End then
+			hud.SetSprint(false)
+		end
+		return Enum.ContextActionResult.Pass
+	end, false, Enum.KeyCode.LeftShift, Enum.KeyCode.ButtonL3)
+	ContextActionService:BindAction("Emotes", function(_, inputState)
+		if inputState == Enum.UserInputState.Begin then
+			hud.ToggleEmotes()
+		end
+		return Enum.ContextActionResult.Pass
+	end, false, Enum.KeyCode.T, Enum.KeyCode.ButtonX)
 	for key, ab in pairs(UpgradeData.Abilities) do
 		if ab.Key then
 			ContextActionService:BindAction("Ability_" .. key, function(_, inputState)
@@ -28,9 +47,15 @@ function Input.Init(windows)
 		{ Enum.KeyCode.N, "Index" },
 		{ Enum.KeyCode.M, "Shop" },
 		{ Enum.KeyCode.L, "LockBase" },
+		{ Enum.KeyCode.P, "Pets" },
+		{ Enum.KeyCode.DPadUp, "Inventory" },
+		{ Enum.KeyCode.DPadLeft, "Pets" },
+		{ Enum.KeyCode.DPadRight, "Shop" },
+		{ Enum.KeyCode.DPadDown, "Leaderboard" },
+		{ Enum.KeyCode.ButtonSelect, "Settings" },
 	}
-	for _, mk in ipairs(menuKeys) do
-		ContextActionService:BindAction("Menu_" .. mk[2], function(_, inputState)
+	for i, mk in ipairs(menuKeys) do
+		ContextActionService:BindAction("Menu_" .. i, function(_, inputState)
 			if inputState == Enum.UserInputState.Begin then
 				if mk[2] == "LockBase" then
 					State.Request("LockBase")

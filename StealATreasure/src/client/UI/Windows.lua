@@ -112,6 +112,14 @@ function Windows.Open(name: string, arg: any?)
 	entry.Scale.Scale = 0.7
 	TweenService:Create(entry.Scale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 	Sound.Play("Hover", 0.5)
+	-- console: give the gamepad a selected button so menus are navigable
+	local UserInputService = game:GetService("UserInputService")
+	if UserInputService.GamepadEnabled then
+		local close = entry.Frame:FindFirstChild("Header") and entry.Frame.Header:FindFirstChild("Close")
+		if close then
+			game:GetService("GuiService").SelectedObject = close
+		end
+	end
 	if entry.Module.OnOpen then
 		task.spawn(entry.Module.OnOpen, arg)
 	end
@@ -140,6 +148,9 @@ function Windows.Close(instant: boolean?)
 		end)
 	end
 	dim.Visible = false
+	if game:GetService("GuiService").SelectedObject and game:GetService("GuiService").SelectedObject:IsDescendantOf(entry.Frame) then
+		game:GetService("GuiService").SelectedObject = nil
+	end
 	Windows.Changed:Fire(nil)
 end
 

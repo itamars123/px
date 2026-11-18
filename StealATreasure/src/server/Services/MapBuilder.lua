@@ -155,6 +155,10 @@ local function tree(parent: Instance, pos: Vector3, scale: number, leafColor: Co
 	return m
 end
 
+MapBuilder.Tree = tree
+MapBuilder.Ball = ball
+MapBuilder.Rng = rng
+
 local function rock(parent, pos: Vector3, size: Vector3, color: Color3?)
 	return part(parent, size, CFrame.new(pos) * CFrame.Angles(rng:NextNumber(-0.3, 0.3), rng:NextNumber(0, math.pi * 2), rng:NextNumber(-0.3, 0.3)), color or Color3.fromRGB(130, 130, 140), Enum.Material.Slate)
 end
@@ -395,6 +399,8 @@ local function isClear(pos: Vector3, map): boolean
 	return true
 end
 
+MapBuilder.IsClear = isClear
+
 local function buildNature(root: Instance, map)
 	local nature = folder("Nature", root)
 	local placed = 0
@@ -405,7 +411,8 @@ local function buildNature(root: Instance, map)
 		local t = rng:NextNumber(0, math.pi * 2)
 		local pos = Vector3.new(math.cos(t) * r, 0, math.sin(t) * r)
 		if isClear(pos, map) then
-			tree(nature, pos, rng:NextNumber(0.8, 1.5))
+			local t = tree(nature, pos, rng:NextNumber(0.8, 1.5))
+			game:GetService("CollectionService"):AddTag(t, "Tree")
 			placed += 1
 		end
 	end
@@ -647,8 +654,21 @@ function MapBuilder.Build()
 		KeepClear = {},
 	}
 
-	-- Ground (a few large tiles; parts can't exceed 2048 studs)
-	part(root, Vector3.new(1400, 4, 1400), CFrame.new(0, -2, 0), Color3.fromRGB(110, 205, 95), Enum.Material.Grass, { Name = "Ground" })
+	-- Ground: real smooth terrain grass (animated grass blades with GlobalWind)
+	local terrain = workspace.Terrain
+	terrain:Clear()
+	terrain:FillBlock(CFrame.new(0, -4, 0), Vector3.new(1400, 8, 1400), Enum.Material.Grass)
+	terrain:SetMaterialColor(Enum.Material.Grass, Color3.fromRGB(105, 200, 90))
+	terrain:SetMaterialColor(Enum.Material.Sand, Color3.fromRGB(240, 220, 160))
+	pcall(function()
+		terrain.Decoration = true
+	end)
+	terrain.WaterColor = Color3.fromRGB(40, 170, 220)
+	terrain.WaterWaveSize = 0.3
+	terrain.WaterWaveSpeed = 12
+	terrain.WaterReflectance = 0.6
+	terrain.WaterTransparency = 0.5
+	workspace.GlobalWind = Vector3.new(8, 0, 4)
 	-- Kill floor far below for anyone who glitches out
 	part(root, Vector3.new(2000, 2, 2000), CFrame.new(0, -200, 0), Color3.new(), nil, { Name = "KillFloor", Transparency = 1, CanCollide = false, CanTouch = true })
 
@@ -660,7 +680,10 @@ function MapBuilder.Build()
 	buildVault(root, map)
 	buildCrater(root, map)
 	buildShrine(root, map)
+	local Details = require(script.Parent.MapDetails)
+	Details.BuildBefore(root, map, MapBuilder)
 	buildNature(root, map)
+	Details.BuildAfter(root, map, MapBuilder)
 
 	-- Base slot transforms (BaseService builds the bases themselves)
 	map.BaseSlots = {}

@@ -61,6 +61,8 @@ function State.Init()
 		State.Stats = stats
 		if State.Full then
 			State.Full.Money = stats.Money
+			State.Full.Gems = stats.Gems
+			State.Full.Vault = stats.Vault
 			State.Full.Level = stats.Level
 			State.Full.XP = stats.XP
 			State.Full.XPNext = stats.XPNext

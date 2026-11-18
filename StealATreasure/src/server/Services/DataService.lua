@@ -22,13 +22,21 @@ local TEMPLATE = {
 	Rebirths = 0,
 	XP = 0,
 	Level = 1,
-	Upgrades = { Speed = 0, Carry = 0, Base = 0, Protection = 0, Income = 0 },
+	Gems = Config.Gems.Start,
+	Vault = 0, -- uncollected income waiting on your collector pad
+	Upgrades = { Speed = 0, Carry = 0, Base = 0, Protection = 0, Income = 0, Luck = 0, Security = 0, Walls = 0, Floors = 0 },
+	Pets = {}, -- [uid] = { Id = string, Equipped = boolean }
+	ExtraPetSlots = 0,
+	AutoCollect = false,
+	Boosts = {}, -- [name] = os.time() expiry
+	Achievements = {}, -- [id] = true
+	BaseColor = 0, -- 0 = slot default, otherwise index into UpgradeData.BaseColors
 	Abilities = {},
 	Treasures = {}, -- [uid] = { Id = string, Plot = number? }
 	Index = {}, -- [treasureId] = true
 	Secrets = {}, -- [secretName] = true
-	Settings = { Music = true, Sfx = true, LowGfx = false, UIScale = 1, Effects = true },
-	Stats = { Steals = 0, Robbed = 0, Collected = 0, Trades = 0, Defends = 0 },
+	Settings = { Music = true, Sfx = true, LowGfx = false, UIScale = 1, Effects = true, Weather = true, Intro = true },
+	Stats = { Steals = 0, Robbed = 0, Collected = 0, Trades = 0, Defends = 0, Hatched = 0, ChestsOpened = 0, EventsJoined = 0 },
 	Titles = {},
 	Title = "",
 	Trail = nil,
@@ -78,6 +86,11 @@ local function newSession(player: Player)
 		Trade = nil,
 		MPS = 0,
 		JoinTime = os.time(),
+		Stamina = Config.Sprint.MaxStamina,
+		Sprinting = false,
+		CameraAlerts = {}, -- [intruder] = last alert clock
+		PetBonus = { Money = 0, Luck = 0, Speed = 0, Gems = 0 },
+		Aura = 0,
 	}
 end
 

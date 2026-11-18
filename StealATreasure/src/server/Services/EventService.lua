@@ -1,9 +1,12 @@
 -- EventService.lua
 -- Timed world events that pull players to special locations:
---   Golden Hour     - 2x income for everyone, fountain turns gold
---   Meteor Shower   - meteors crash into the Meteor Crater dropping Epic+ loot
---   Treasure Rain   - a burst of free treasures across every field
---   Divine Descent  - a Mythical+ treasure descends onto the Celestial Shrine
+--   Double Money        - 2x income for everyone, fountain turns gold
+--   Meteor Shower       - meteors crash into the Meteor Crater dropping Epic+ loot
+--   Golden Treasure Rain- golden coins + free treasures rain on every field
+--   Treasure Apocalypse - the sky turns red and high-rarity treasures flood the map
+--   Secret Treasure     - a Secret/Divine/Celestial treasure appears in a secret area
+--   Lucky Treasure      - everyone's luck is doubled and lucky treasures spawn
+--   Divine Descent      - a Mythical+ treasure descends onto the Celestial Shrine
 
 local Debris = game:GetService("Debris")
 local TweenService = game:GetService("TweenService")
@@ -29,8 +32,8 @@ end
 
 local function goldenHour()
 	local d = Config.Events.GoldenHourDuration
-	setState("Golden Hour", d)
-	Remotes.Announce:FireAllClients(("🌟 GOLDEN HOUR! All income x%d for %ds!"):format(Config.Events.GoldenHourMultiplier, d), "Legendary")
+	setState("Double Money", d)
+	Remotes.Announce:FireAllClients(("💸 DOUBLE MONEY! All income x%d for %ds!"):format(Config.Events.GoldenHourMultiplier, d), "Legendary")
 	S.EconomyService.EventMultiplier = Config.Events.GoldenHourMultiplier
 	local water = S.MapBuilder.Map.FountainWater
 	local oldColor = water and water.Color
@@ -98,15 +101,75 @@ local function meteorShower()
 end
 
 local function treasureRain()
-	setState("Treasure Rain", 30)
-	Remotes.Announce:FireAllClients("🌧️ TREASURE RAIN! Free treasures are falling on every field!", "Rare")
+	setState("Golden Treasure Rain", 40)
+	Remotes.Announce:FireAllClients("🪙 GOLDEN TREASURE RAIN! Coins and treasures are falling on every field!", "Legendary")
 	local fields = S.MapBuilder.Map.Fields
 	for i = 1, Config.Events.TreasureRainCount do
 		local field = fields[rng:NextInteger(1, #fields)]
 		S.TreasureService.SpawnInField(field, { Uncommon = 40, Rare = 35, Epic = 18, Legendary = 6, Mythical = 1 })
-		task.wait(0.6)
+		for _ = 1, 3 do
+			local a = rng:NextNumber(0, math.pi * 2)
+			local r = rng:NextNumber(0, field.Radius + 6)
+			S.WorldService.SpawnCoin(field.Center + Vector3.new(math.cos(a) * r, 0.5, math.sin(a) * r))
+		end
+		task.wait(0.8)
 	end
 	task.wait(15)
+	setState(nil, 0)
+end
+
+local function apocalypse()
+	local d = Config.Events.ApocalypseDuration
+	setState("Treasure Apocalypse", d)
+	Remotes.Announce:FireAllClients("☠️ TREASURE APOCALYPSE! The sky burns and legendary loot floods the world!", "Secret")
+	Remotes.Effect:FireAllClients("GlobalShake", 0.4)
+	local fields = S.MapBuilder.Map.Fields
+	local t = 0
+	while t < d do
+		local field = fields[rng:NextInteger(1, #fields)]
+		S.TreasureService.SpawnInField(field, Config.SpawnPools.Apocalypse)
+		if rng:NextNumber() < 0.4 then
+			local crater = S.MapBuilder.Map.Crater
+			local def = TreasureData.RollFromPool(Config.SpawnPools.Apocalypse, rng)
+			local a = rng:NextNumber(0, math.pi * 2)
+			S.TreasureService.SpawnWorld(def, CFrame.new(crater.Center + Vector3.new(math.cos(a) * 20, 0.5, math.sin(a) * 20)), "Event", { Region = "Meteor Crater", Lifetime = 90 })
+		end
+		task.wait(3)
+		t += 3
+	end
+	setState(nil, 0)
+end
+
+local function secretSpawn()
+	local secrets = S.MapBuilder.Map.Secrets
+	local secret = secrets[rng:NextInteger(1, #secrets)]
+	local def = TreasureData.RollFromPool(Config.SpawnPools.SecretSpawn, rng)
+	setState("Secret Treasure", 90)
+	Remotes.Announce:FireAllClients(("🤫 SECRET TREASURE! A %s treasure appeared somewhere in the %s!"):format(def.Rarity, secret.Name), def.Rarity)
+	local spot = secret.Spawns[rng:NextInteger(1, #secret.Spawns)] + Vector3.new(0, 0.5, 0)
+	local record = S.TreasureService.SpawnWorld(def, CFrame.new(spot), "Event", { Region = secret.Name, Lifetime = 90 })
+	local t = 0
+	while t < 90 and S.TreasureService.World[record.Uid] do
+		task.wait(1)
+		t += 1
+	end
+	setState(nil, 0)
+end
+
+local function luckyEvent()
+	local d = Config.Events.LuckyDuration
+	setState("Lucky Treasure", d)
+	Remotes.Announce:FireAllClients(("🍀 LUCKY TREASURE EVENT! Everyone has x%d luck for %ds!"):format(Config.Events.LuckyMultiplier, d), "Epic")
+	S.EconomyService.EventLuck = Config.Events.LuckyMultiplier - 1
+	local fields = S.MapBuilder.Map.Fields
+	local t = 0
+	while t < d do
+		local field = fields[rng:NextInteger(1, #fields)]
+		S.TreasureService.SpawnInField(field, Config.SpawnPools.Lucky)
+		task.wait(10)
+		t += 10
+	end
+	S.EconomyService.EventLuck = 0
 	setState(nil, 0)
 end
 
@@ -127,10 +190,13 @@ local function divineDescent()
 end
 
 local EVENTS = {
-	{ Fn = goldenHour, Weight = 30 },
-	{ Fn = meteorShower, Weight = 30 },
-	{ Fn = treasureRain, Weight = 30 },
-	{ Fn = divineDescent, Weight = 10 },
+	{ Fn = goldenHour, Weight = 22 },
+	{ Fn = meteorShower, Weight = 20 },
+	{ Fn = treasureRain, Weight = 20 },
+	{ Fn = luckyEvent, Weight = 16 },
+	{ Fn = secretSpawn, Weight = 10 },
+	{ Fn = apocalypse, Weight = 6 },
+	{ Fn = divineDescent, Weight = 6 },
 }
 
 function EventService.RunRandom()
@@ -154,6 +220,26 @@ end
 
 function EventService.Start()
 	setState(nil, 0)
+	-- Studio-only testing helper: trigger any event from the Settings menu
+	if game:GetService("RunService"):IsStudio() then
+		local byName = {
+			DoubleMoney = goldenHour,
+			Meteor = meteorShower,
+			GoldenRain = treasureRain,
+			Lucky = luckyEvent,
+			Secret = secretSpawn,
+			Apocalypse = apocalypse,
+			Divine = divineDescent,
+		}
+		S.NetService.Handle("DebugEvent", function(_, name)
+			local fn = byName[name]
+			if not fn or EventService.Current then
+				return false, "Unknown event or one is already running"
+			end
+			task.spawn(fn)
+			return true, "Started " .. name
+		end)
+	end
 	task.spawn(function()
 		while true do
 			local wait = rng:NextNumber(Config.Events.IntervalMin, Config.Events.IntervalMax)
@@ -164,6 +250,7 @@ function EventService.Start()
 				warn("[Events] " .. tostring(err))
 				setState(nil, 0)
 				S.EconomyService.EventMultiplier = 1
+				S.EconomyService.EventLuck = 0
 			end
 		end
 	end)

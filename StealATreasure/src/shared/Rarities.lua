@@ -3,7 +3,7 @@
 
 local Rarities = {}
 
-Rarities.Order = { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythical", "Secret", "Divine" }
+Rarities.Order = { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythical", "Secret", "Divine", "Celestial" }
 
 Rarities.Info = {
 	Common = {
@@ -109,6 +109,20 @@ Rarities.Info = {
 		Rainbow = true,
 		Smoke = false,
 		Announce = true,
+	},
+	Celestial = {
+		Rank = 9,
+		Color = Color3.fromRGB(110, 210, 255),
+		Glow = Color3.fromRGB(190, 160, 255),
+		Sparkles = true,
+		Particles = 30,
+		Light = 26,
+		Beam = true,
+		Halo = true,
+		Rainbow = true,
+		Smoke = false,
+		Announce = true,
+		Orbit = true, -- orbiting star moons
 	},
 }
 

@@ -18,6 +18,7 @@ local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
 local Remotes = require(Shared.Remotes)
 local Rarities = require(Shared.Rarities)
 local State = require(script.Parent.State)
+local Util = require(Shared.Util)
 local Sound = require(script.Parent.Sound)
 
 local player = Players.LocalPlayer
@@ -28,44 +29,10 @@ WorldFX.Effects = true
 
 local Windows, Notifications -- injected
 
-local tracked: { [Model]: { Root: BasePart, Speed: number, Phase: number, Rank: number } } = {}
-local ANIM_DISTANCE = 140
-
-local SPIN = { 0.6, 0.7, 0.8, 0.9, 1.1, 1.3, 1.5, 1.8 }
-
-local function track(model: Model)
-	if tracked[model] or model:GetAttribute("Carried") then
-		return
-	end
-	local root = model:FindFirstChild("Root")
-	if not root or not root:IsA("BasePart") then
-		return
-	end
-	local rank = Rarities.Rank(model:GetAttribute("Rarity") or "Common")
-	tracked[model] = { Root = root, Speed = SPIN[rank] or 1, Phase = math.random() * 6, Rank = rank }
-	WorldFX.ApplyQuality(model)
-end
-
-local function untrack(model: Model)
-	tracked[model] = nil
-end
-
-function WorldFX.ApplyQuality(model: Instance)
-	local showFx = WorldFX.Effects and not WorldFX.LowGfx
-	for _, d in ipairs(model:GetDescendants()) do
-		if d:IsA("ParticleEmitter") or d:IsA("Beam") then
-			d.Enabled = showFx
-		elseif d:IsA("PointLight") then
-			d.Enabled = showFx
-		end
-	end
-end
+local TreasureAnimator = require(script.Parent.TreasureAnimator)
 
 local function applyAllQuality()
-	for model in pairs(tracked) do
-		WorldFX.ApplyQuality(model)
-	end
-	-- global quality
+	TreasureAnimator.SetQuality(WorldFX.LowGfx, WorldFX.Effects)
 	Lighting.GlobalShadows = not WorldFX.LowGfx
 	local bloom = Lighting:FindFirstChild("GameBloom")
 	if bloom then
@@ -84,48 +51,6 @@ function WorldFX.SetSettings(settings)
 		WorldFX.LowGfx = low
 		WorldFX.Effects = fx
 		applyAllQuality()
-	end
-end
-
--- Treasure animation ------------------------------------------------------
-local RAINBOW_SPEED = 0.25
-local function animate()
-	if WorldFX.LowGfx then
-		return
-	end
-	local cam = workspace.CurrentCamera
-	if not cam then
-		return
-	end
-	local camPos = cam.CFrame.Position
-	local t = os.clock()
-	for model, info in pairs(tracked) do
-		if not model.Parent then
-			tracked[model] = nil
-		else
-			local home = model:GetAttribute("Home")
-			if typeof(home) == "CFrame" and info.Root.Anchored then
-				if (home.Position - camPos).Magnitude < ANIM_DISTANCE then
-					local bob = math.sin(t * 2 + info.Phase) * 0.25 + 0.3
-					info.Root.CFrame = home * CFrame.new(0, bob, 0) * CFrame.Angles(0, (t * info.Speed + info.Phase) % (math.pi * 2), 0)
-					if model:GetAttribute("Rainbow") then
-						local c = Color3.fromHSV((t * RAINBOW_SPEED + info.Phase) % 1, 0.7, 1)
-						local halo = model:FindFirstChild("Halo")
-						if halo then
-							for _, seg in ipairs(halo:GetChildren()) do
-								(seg :: BasePart).Color = c
-							end
-						end
-					end
-					if model:GetAttribute("Lightning") then
-						local glow = info.Root:FindFirstChild("FxAttachment") and info.Root.FxAttachment:FindFirstChild("Glow")
-						if glow then
-							glow.Brightness = (math.random() < 0.08) and 6 or 1.6
-						end
-					end
-				end
-			end
-		end
 	end
 end
 
@@ -152,7 +77,7 @@ local function watchDescendant(d: Instance)
 	if d:IsA("ProximityPrompt") then
 		updatePrompt(d)
 	elseif d:IsA("Model") and d:GetAttribute("TreasureId") then
-		track(d)
+		TreasureAnimator.Track(d)
 	end
 end
 
@@ -318,6 +243,41 @@ local function onEffect(kind: string, a, b)
 	elseif kind == "Confetti" then
 		Notifications.Confetti()
 		Sound.Play("Legendary", 0.6)
+	elseif kind == "GlobalShake" then
+		shake(a or 0.4, 1.2)
+	elseif kind == "ChestOpen" then
+		Notifications.Confetti()
+	elseif kind == "Coin" then
+		Sound.Play("Collect", 0.5, 1.4)
+		Notifications.MoneyPop("+" .. Util.Money(a or 0), Color3.fromRGB(255, 220, 80))
+	elseif kind == "Collect" then
+		Sound.Play("Collect", 0.8)
+		Notifications.MoneyPop("💰 +" .. Util.Money(a or 0), Color3.fromRGB(120, 255, 120))
+		fovPunch(6, 0.4)
+	elseif kind == "Discovery" then
+		Sound.Play("Discovery", 0.8)
+		Notifications.DiscoveryCard(a)
+	elseif kind == "Achievement" then
+		Sound.Play("LevelUp", 0.7)
+		Notifications.Confetti()
+	elseif kind == "Portal" then
+		Sound.Play("Portal", 0.8)
+		fovPunch(30, 0.8)
+		Notifications.Flash(Color3.fromRGB(180, 140, 255))
+	elseif kind == "Zap" and typeof(a) == "Vector3" and typeof(b) == "Vector3" then
+		local p0 = Instance.new("Part")
+		p0.Anchored = true
+		p0.CanCollide = false
+		p0.CanQuery = false
+		p0.Material = Enum.Material.Neon
+		p0.Color = Color3.fromRGB(255, 60, 60)
+		local len = (b - a).Magnitude
+		p0.Size = Vector3.new(0.4, 0.4, len)
+		p0.CFrame = CFrame.lookAt((a + b) / 2, b)
+		p0.Parent = workspace
+		Sound.Play("Bonk", 0.8, 1.5)
+		TweenService:Create(p0, TweenInfo.new(0.4), { Transparency = 1, Size = Vector3.new(0.05, 0.05, len) }):Play()
+		game:GetService("Debris"):AddItem(p0, 0.5)
 	end
 end
 
@@ -333,8 +293,21 @@ function WorldFX.Start()
 	end
 	workspace.DescendantAdded:Connect(watchDescendant)
 	workspace.DescendantRemoving:Connect(function(d)
-		if d:IsA("Model") and tracked[d] then
-			untrack(d)
+		if d:IsA("Model") and d:GetAttribute("TreasureId") then
+			TreasureAnimator.Untrack(d)
+		end
+	end)
+	TreasureAnimator.Start()
+	-- stealing pose: tell the server while we hold a Steal prompt
+	ProximityPromptService.PromptButtonHoldBegan:Connect(function(prompt)
+		if prompt:GetAttribute("Kind") == "Steal" then
+			State.Ask("SetStealing", true)
+			Sound.Play("Steal", 0.5)
+		end
+	end)
+	ProximityPromptService.PromptButtonHoldEnded:Connect(function(prompt)
+		if prompt:GetAttribute("Kind") == "Steal" then
+			State.Ask("SetStealing", false)
 		end
 	end)
 
@@ -363,16 +336,20 @@ function WorldFX.Start()
 		if who ~= player then
 			return
 		end
+		if prompt:GetAttribute("Kind") == "Steal" then
+			State.Ask("SetStealing", false)
+		end
 		local ui = prompt:GetAttribute("OpenUI")
 		if ui == "Sell" then
 			Windows.Open("Inventory", "Sell")
+		elseif ui == "Pets" then
+			Windows.Open("Pets", "Eggs")
 		elseif ui then
 			Windows.Open(ui)
 		end
 	end)
 
 	RunService.RenderStepped:Connect(function()
-		animate()
 		if os.clock() < shakeUntil then
 			local cam = workspace.CurrentCamera
 			local s = shakeAmount

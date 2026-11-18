@@ -15,6 +15,7 @@ local UpgradeData = require(Shared.UpgradeData)
 local Rarities = require(Shared.Rarities)
 local Remotes = require(Shared.Remotes)
 local Util = require(Shared.Util)
+local Motion = require(Shared.Motion)
 
 local S
 
@@ -87,6 +88,13 @@ function TreasureService.Give(player: Player, id: string, opts)
 		data.Index[id] = true
 		local bonus = math.floor(def.MPS * 10 * Config.DiscoveryBonusMultiplier)
 		S.EconomyService.AddMoney(player, bonus)
+		local gems = Config.Gems.DiscoveryByRank[Rarities.Rank(def.Rarity)]
+		if gems then
+			S.EconomyService.AddGems(player, gems)
+		end
+		if Rarities.Rank(def.Rarity) >= 5 then
+			Remotes.Effect:FireClient(player, "Discovery", def.Id)
+		end
 		if not opts.Silent then
 			S.NetService.Notify(player, ("📖 NEW DISCOVERY: %s! +%s"):format(def.Name, Util.Money(bonus)), "discovery")
 		end
@@ -98,6 +106,9 @@ function TreasureService.Give(player: Player, id: string, opts)
 		S.EconomyService.AddXP(player, xp)
 	end
 	Remotes.Effect:FireClient(player, "Deposit", def.Rarity)
+	if Rarities.Rank(def.Rarity) >= 5 and opts.Source ~= "Trade" then
+		S.PlayerService.Emote(player, "Celebrate", 3)
+	end
 	S.BaseService.Refresh(player)
 	S.StateService.MarkFull(player)
 	return uid
@@ -147,7 +158,7 @@ function TreasureService.Place(player: Player, uid: string, plot: number?)
 	local target = nil
 	if typeof(plot) == "number" then
 		plot = math.floor(plot)
-		if plot < 1 or plot > UpgradeData.PlotCount(data) then
+		if not S.BaseService.IsPlotUnlocked(data, plot) then
 			return false, "That platform is locked"
 		end
 		for _, t in pairs(data.Treasures) do
@@ -253,12 +264,33 @@ local function groundAt(pos: Vector3): Vector3
 	return result and result.Position or pos
 end
 
-function TreasureService.RemoveWorld(uid: string)
+-- Current server-side position of a world treasure (accounts for wandering).
+function TreasureService.WorldPosition(record): Vector3
+	if record.Seed then
+		return Motion.Position(record.Home, record.Seed, now(), Config.World.WanderRadius)
+	end
+	return record.Home.Position
+end
+
+function TreasureService.RemoveWorld(uid: string, animate: boolean?)
 	local w = TreasureService.World[uid]
 	if w then
 		TreasureService.World[uid] = nil
 		if w.Model then
-			w.Model:Destroy()
+			if animate then
+				-- clients play a shrink-and-sparkle disappear animation
+				w.Model:SetAttribute("Despawning", true)
+				local prompt = w.Model.PrimaryPart and w.Model.PrimaryPart:FindFirstChild("GrabPrompt")
+				if prompt then
+					prompt.Enabled = false
+				end
+				local m = w.Model
+				task.delay(0.6, function()
+					m:Destroy()
+				end)
+			else
+				w.Model:Destroy()
+			end
 		end
 	end
 end
@@ -303,11 +335,22 @@ function TreasureService.SpawnWorld(def, cf: CFrame, kind: string, extra)
 	prompt.RequiresLineOfSight = false
 	prompt:SetAttribute("Kind", kind)
 	prompt.Parent = root
+	-- Field treasures roam around (walk / run / jump / dance) on a deterministic
+	-- path every client renders identically; the server validates against it.
+	local wander = kind == "Field" and not (extra and extra.NoWander)
+	local seed = rng:NextInteger(1, 1000000)
+	if wander then
+		model:SetAttribute("WanderSeed", seed)
+		model:SetAttribute("WanderRadius", Config.World.WanderRadius)
+	end
+	model:SetAttribute("SpawnTime", now())
 	local record = {
 		Uid = uid,
 		Id = def.Id,
 		Kind = kind,
 		Model = model,
+		Home = cf,
+		Seed = wander and seed or nil,
 		Spawned = os.clock(),
 		Price = price,
 		Region = extra and extra.Region,
@@ -345,7 +388,7 @@ tryPickup = function(player: Player, uid: string)
 	if not hrp then
 		return false
 	end
-	if (record.Model:GetPivot().Position - hrp.Position).Magnitude > Config.Spawns.PickupDistance + 4 then
+	if (TreasureService.WorldPosition(record) - hrp.Position).Magnitude > Config.Spawns.PickupDistance + 5 then
 		return false
 	end
 	if session.Trade then
@@ -367,9 +410,23 @@ tryPickup = function(player: Player, uid: string)
 		end
 		data.Money -= record.Price
 	end
-	TreasureService.RemoveWorld(uid)
-	S.CarryService.Add(player, { Id = record.Id, Source = record.Kind })
-	Remotes.Effect:FireClient(player, "Pickup", TreasureData.Get(record.Id).Rarity)
+	TreasureService.RemoveWorld(uid, true)
+	-- Luck: chance to upgrade a free treasure by one rarity tier
+	local id = record.Id
+	if not record.Price then
+		local luck = S.EconomyService.Luck(player)
+		local chance = math.min(Config.Luck.MaxUpgradeChance, (luck - 1) * Config.Luck.UpgradeChancePerLuck)
+		if chance > 0 and rng:NextNumber() < chance then
+			local def = TreasureData.Get(id)
+			local nextRarity = Rarities.Order[Rarities.Rank(def.Rarity) + 1]
+			if nextRarity then
+				id = TreasureData.RandomOfRarity(nextRarity, rng).Id
+				S.NetService.Notify(player, ("🍀 LUCKY! It turned into a %s!"):format(nextRarity), "discovery")
+			end
+		end
+	end
+	S.CarryService.Add(player, { Id = id, Source = record.Kind })
+	Remotes.Effect:FireClient(player, "Pickup", TreasureData.Get(id).Rarity)
 	if record.Price then
 		S.NetService.Notify(player, "Purchased! Carry it back to your base.", "success")
 	end
@@ -402,13 +459,13 @@ local function restockMarket()
 	-- clear old stock
 	for uid, w in pairs(TreasureService.World) do
 		if w.Kind == "Market" then
-			TreasureService.RemoveWorld(uid)
+			TreasureService.RemoveWorld(uid, true)
 		end
 	end
 	for _, stall in ipairs(S.MapBuilder.Map.Stalls) do
 		local def = TreasureData.RollFromPool(Config.SpawnPools.Market, rng)
 		local price = math.floor(def.Value * Config.Market.PriceMultiplier)
-		TreasureService.SpawnWorld(def, stall.CFrame, "Market", { Price = price, Region = "Stall" .. stall.Index, Lifetime = math.huge })
+		TreasureService.SpawnWorld(def, stall.CFrame * CFrame.Angles(0, math.pi, 0), "Market", { Price = price, Region = "Stall" .. stall.Index, Lifetime = math.huge })
 	end
 	nextRestock = now() + Config.Market.RestockSeconds
 	workspace:SetAttribute("MarketRestock", nextRestock)
@@ -494,7 +551,7 @@ function TreasureService.Start()
 			local t = os.clock()
 			for uid, w in pairs(TreasureService.World) do
 				if w.Kind ~= "Market" and t - w.Spawned > w.Lifetime then
-					TreasureService.RemoveWorld(uid)
+					TreasureService.RemoveWorld(uid, true)
 				end
 			end
 			-- market restock
@@ -529,6 +586,7 @@ function TreasureService.Start()
 									local reward = 2500 * (1 + data.Rebirths)
 									S.EconomyService.AddMoney(player, reward)
 									S.EconomyService.AddXP(player, 100)
+									S.EconomyService.AddGems(player, Config.Gems.SecretFound)
 									S.NetService.Notify(player, ("🗺️ SECRET FOUND: %s! +%s"):format(secret.Name, Util.Money(reward)), "discovery")
 									Remotes.Effect:FireClient(player, "Confetti")
 									S.StateService.MarkFull(player)
@@ -540,12 +598,13 @@ function TreasureService.Start()
 						local radius = 18
 						for uid, w in pairs(TreasureService.World) do
 							if w.Kind ~= "Market" and w.Model then
-								if (w.Model:GetPivot().Position - hrp.Position).Magnitude <= radius then
+								if (TreasureService.WorldPosition(w) - hrp.Position).Magnitude <= radius then
 									if not S.CarryService.CanCarry(player) then
 										break
 									end
-									-- pull it close then pick up (server validates distance)
-									w.Model:PivotTo(CFrame.new(hrp.Position))
+									-- magnet: grab it from range (validated with the magnet radius)
+									w.Seed = nil
+									w.Home = CFrame.new(hrp.Position)
 									tryPickup(player, uid)
 								end
 							end

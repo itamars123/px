@@ -183,6 +183,64 @@ function Notifications.Splash(title: string, subtitle: string, color: Color3)
 	Notifications.Confetti()
 end
 
+-- Big "NEW DISCOVERY" card with a rotating 3D preview of the treasure.
+function Notifications.DiscoveryCard(treasureId: string)
+	local TreasureData = require(Shared.TreasureData)
+	local Preview = require(script.Parent.Preview)
+	local def = TreasureData.Get(treasureId)
+	if not def then
+		return
+	end
+	local color = Rarities.Color(def.Rarity)
+	local card = Lib.panel({
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.45),
+		Size = UDim2.fromOffset(300, 340),
+		BackgroundColor3 = T.Bg,
+		ZIndex = 55,
+		Radius = 20,
+		Parent = gui,
+	})
+	Lib.stroke(color, 4).Parent = card
+	local glow = new("ImageLabel", {
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1.6, 1.6),
+		Position = UDim2.fromScale(0.5, 0.42),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Image = "rbxasset://textures/particles/sparkles_main.dds",
+		ImageColor3 = color,
+		ImageTransparency = 0.3,
+		ZIndex = 54,
+		Parent = card,
+	})
+	local head = Lib.label({ Size = UDim2.new(1, -20, 0, 34), Position = UDim2.fromOffset(10, 8), Text = "✨ NEW DISCOVERY! ✨", Font = T.Title, TextColor3 = T.Accent, ZIndex = 56, Parent = card, MaxText = 26 })
+	Lib.textStroke(2).Parent = head
+	local vp = new("ViewportFrame", { Size = UDim2.new(1, -30, 0, 200), Position = UDim2.fromOffset(15, 46), BackgroundColor3 = T.Panel, ZIndex = 56, Parent = card }, { Lib.corner(14) })
+	local cleanup = Preview.Show(vp, def)
+	local name = Lib.label({ Size = UDim2.new(1, -20, 0, 34), Position = UDim2.fromOffset(10, 252), Text = def.Name, Font = T.Title, ZIndex = 56, Parent = card, MaxText = 28 })
+	Lib.textStroke(2).Parent = name
+	local rar = Lib.label({ Size = UDim2.new(1, -20, 0, 26), Position = UDim2.fromOffset(10, 288), Text = def.Rarity:upper() .. (def.Ability and ("  •  " .. def.Ability) or ""), Font = T.Title, TextColor3 = color, ZIndex = 56, Parent = card, MaxText = 20 })
+	Lib.textStroke(2).Parent = rar
+	local scale = new("UIScale", { Scale = 0.2, Parent = card })
+	TweenService:Create(scale, TweenInfo.new(0.5, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	local spin = TweenService:Create(glow, TweenInfo.new(4, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), { Rotation = 360 })
+	spin:Play()
+	Notifications.Confetti()
+	task.delay(3.5, function()
+		TweenService:Create(scale, TweenInfo.new(0.3), { Scale = 0 }):Play()
+		task.wait(0.35)
+		spin:Cancel()
+		cleanup()
+		card:Destroy()
+	end)
+end
+
+function Notifications.Flash(color: Color3)
+	local f = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = color, BackgroundTransparency = 0.2, ZIndex = 70, Parent = gui })
+	TweenService:Create(f, TweenInfo.new(0.6), { BackgroundTransparency = 1 }):Play()
+	Debris:AddItem(f, 0.7)
+end
+
 function Notifications.Confetti()
 	local colors = { T.Accent, T.Pink, T.Blue, T.Green, T.Purple, T.Orange }
 	for _ = 1, 40 do
