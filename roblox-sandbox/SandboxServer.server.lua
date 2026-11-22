@@ -11,6 +11,7 @@ local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 
 local BlockData = require(ReplicatedStorage:WaitForChild("BlockData"))
+local PixelArt = require(ReplicatedStorage:WaitForChild("PixelArt"))
 local BS, W, H, Z = BlockData.BLOCK_SIZE, BlockData.WIDTH, BlockData.HEIGHT, BlockData.PLANE_Z
 local Blocks = BlockData.Blocks
 
@@ -57,10 +58,16 @@ local function createBlock(x, y, blockType)
 	local part = Instance.new("Part")
 	part.Name = x .. "," .. y
 	part.Anchored = true
-	part.Size = info.size or Vector3.new(BS, BS, BS)
-	part.Position = BlockData.CellToWorld(x, y)
+	if info.back then
+		-- decorations sit behind the player so you can walk "through" them
+		part.Size = Vector3.new(BS, BS, 0.5)
+		part.Position = BlockData.CellToWorld(x, y) + Vector3.new(0, 0, -1.2)
+	else
+		part.Size = Vector3.new(BS, BS, BS)
+		part.Position = BlockData.CellToWorld(x, y)
+	end
 	part.Color = info.color
-	part.Material = info.material
+	part.Material = Enum.Material.SmoothPlastic
 	part.CanCollide = info.solid ~= false
 	part.Transparency = info.transparency or 0
 	part.CastShadow = false
@@ -144,8 +151,8 @@ for x = 0, W - 1 do
 	wall.CastShadow = false
 	wall.Size = Vector3.new(BS, h * BS, 1)
 	wall.Position = Vector3.new(x * BS, h * BS / 2 - BS / 2, Z - BS / 2 - 0.5)
-	wall.Color = Color3.fromRGB(60, 40, 28)
-	wall.Material = Enum.Material.Ground
+	wall.Color = Color3.fromRGB(52, 36, 26)
+	wall.Material = Enum.Material.SmoothPlastic
 	wall.Parent = worldFolder
 end
 
@@ -216,11 +223,59 @@ local lastPlace = {}
 local lastAttack = {}
 local lastHurt = {}
 
+---------------------------------------------------------------------
+-- PIXEL HERO: hide the 3D avatar and weld a pixel sprite to it
+---------------------------------------------------------------------
+local HERO_PS = 0.34   -- stud size of one sprite pixel
+
+local function hide(obj, sprite)
+	if obj:IsDescendantOf(sprite) then return end
+	if obj:IsA("Accessory") or obj:IsA("Clothing") or obj:IsA("ShirtGraphic") then
+		task.defer(function() obj:Destroy() end)
+	elseif obj:IsA("BasePart") then
+		obj.Transparency = 1
+	elseif obj:IsA("Decal") then
+		obj.Transparency = 1
+	end
+end
+
+local function makeHero(character)
+	local root = character:WaitForChild("HumanoidRootPart")
+	local humanoid = character:WaitForChild("Humanoid")
+	-- height of the root above the floor (feet of the sprite touch the ground)
+	local rootHeight = humanoid.HipHeight + root.Size.Y / 2
+	if humanoid.RigType == Enum.HumanoidRigType.R6 then rootHeight = 3 end
+
+	local sprite = Instance.new("Model")
+	sprite.Name = "PixelSprite"
+	local hero = PixelArt.Hero
+	local rows = #hero.body + #hero.legsA
+	local top = -rootHeight + rows * HERO_PS
+	local base = { ps = HERO_PS, top = top, width = #hero.body[1], facing = true }
+
+	PixelArt.BuildLayer(sprite, root, hero.body, hero.palette, base)
+	local legOpts = table.clone(base)
+	legOpts.rowOffset = #hero.body
+	legOpts.tag = "LegA"
+	PixelArt.BuildLayer(sprite, root, hero.legsA, hero.palette, legOpts)
+	legOpts.tag = "LegB"
+	for _, p in ipairs(PixelArt.BuildLayer(sprite, root, hero.legsB, hero.palette, legOpts)) do
+		p.Transparency = 1
+	end
+	sprite.Parent = character
+
+	for _, obj in ipairs(character:GetDescendants()) do hide(obj, sprite) end
+	character.DescendantAdded:Connect(function(obj) hide(obj, sprite) end)
+end
+
 Players.PlayerAdded:Connect(function(player)
 	local inv = Instance.new("Folder")
 	inv.Name = "Inventory"
 	inv.Parent = player
 	add(player, "Torch", START_TORCHES)
+
+	player.CharacterAdded:Connect(makeHero)
+	if player.Character then task.spawn(makeHero, player.Character) end
 end)
 
 Players.PlayerRemoving:Connect(function(player)
@@ -353,8 +408,19 @@ CraftEvent.OnServerEvent:Connect(function(player, index)
 end)
 
 ---------------------------------------------------------------------
--- DAY / NIGHT
+-- DAY / NIGHT  (flat, shadow-less lighting = cleaner pixel look)
 ---------------------------------------------------------------------
+Lighting.GlobalShadows = false
+Lighting.Brightness = 2
+Lighting.Ambient = Color3.fromRGB(70, 70, 90)
+Lighting.OutdoorAmbient = Color3.fromRGB(150, 150, 160)
+Lighting.EnvironmentDiffuseScale = 0
+Lighting.EnvironmentSpecularScale = 0
+for _, effect in ipairs(Lighting:GetChildren()) do
+	if effect:IsA("Atmosphere") or effect:IsA("BloomEffect") or effect:IsA("DepthOfFieldEffect") or effect:IsA("SunRaysEffect") then
+		effect:Destroy()
+	end
+end
 Lighting.ClockTime = 8
 local function isNight()
 	local t = Lighting.ClockTime
@@ -379,26 +445,16 @@ local function spawnEnemy(nearPlayer)
 	local body = Instance.new("Part")
 	body.Name = "Body"
 	body.Size = Vector3.new(2.6, 2.6, 2.6)
-	body.Color = Color3.fromRGB(120, 40, 160)
-	body.Material = Enum.Material.SmoothPlastic
+	body.Transparency = 1 -- invisible hitbox, the pixel sprite is what you see
 	body.Position = BlockData.CellToWorld(ex, ey)
 	body.Parent = model
 
-	for _, offset in ipairs({ -0.6, 0.6 }) do
-		local eye = Instance.new("Part")
-		eye.Name = "Eye"
-		eye.Size = Vector3.new(0.5, 0.5, 0.2)
-		eye.Color = Color3.fromRGB(255, 240, 60)
-		eye.Material = Enum.Material.Neon
-		eye.CanCollide = false
-		eye.Massless = true
-		eye.CFrame = body.CFrame * CFrame.new(offset, 0.5, 1.35)
-		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = body
-		weld.Part1 = eye
-		weld.Parent = eye
-		eye.Parent = model
-	end
+	local monster = PixelArt.Monster
+	PixelArt.BuildLayer(model, body, monster.rows, monster.palette, {
+		ps = 2.6 / #monster.rows,
+		top = 1.3,
+		width = #monster.rows[1],
+	})
 
 	model.PrimaryPart = body
 	model:SetAttribute("Health", ENEMY_HEALTH)
@@ -450,6 +506,11 @@ local targets = {}   -- [enemy] = targetX or nil
 RunService.Heartbeat:Connect(function(dt)
 	-- clock
 	Lighting.ClockTime = (Lighting.ClockTime + dt * 24 / DAY_LENGTH) % 24
+	-- fade the world light: dark nights make torches matter
+	local t = Lighting.ClockTime
+	local daylight = math.clamp(math.min(t - 5, 19 - t) / 2, 0, 1)
+	Lighting.OutdoorAmbient = Color3.fromRGB(35, 35, 65):Lerp(Color3.fromRGB(150, 150, 160), daylight)
+	Lighting.Brightness = 0.2 + 1.8 * daylight
 	local night = isNight()
 	if night ~= wasNight then
 		wasNight = night
