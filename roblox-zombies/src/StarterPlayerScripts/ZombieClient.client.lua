@@ -21,6 +21,10 @@ local firing, wantShot, sprinting = false, false, false
 local lastShot = 0
 local recoil, reloadBlend, bobBlend = 0, 0, 0
 local currentVM = nil -- weapon name the viewmodel was built for
+local shake = 0 -- camera shake amount
+local function addShake(amount)
+	shake = math.min(shake + amount, 1.2)
+end
 
 ---------------------------------------------------------------- sounds
 local function playSound(id, volume)
@@ -396,6 +400,7 @@ local function tryFire()
 	ActionRemote:FireServer("Fire", origin, dir)
 
 	recoil = math.min(recoil + (c.Recoil or 1), 3)
+	addShake(0.18 * (c.Recoil or 1))
 	flashMuzzle()
 	playSound(Config.Sounds.Fire, 0.5)
 
@@ -444,8 +449,167 @@ UserInputService.InputChanged:Connect(function(input, processed)
 	switchTo(nextSlot)
 end)
 
+---------------------------------------------------------------- juice: blood, gore, shake, popups
+local activeBits = 0
+local function burst(pos, count, colors, speed, size)
+	if activeBits > 220 then
+		return
+	end
+	for _ = 1, count do
+		local s = size * rng:NextNumber(0.5, 1.3)
+		local p = Instance.new("Part")
+		p.Size = Vector3.new(s, s, s)
+		p.CFrame = CFrame.new(pos) * CFrame.Angles(rng:NextNumber(0, 6), rng:NextNumber(0, 6), 0)
+		p.Color = colors[rng:NextInteger(1, #colors)]
+		p.Material = Enum.Material.SmoothPlastic
+		p.CanQuery = false
+		p.CanTouch = false
+		p.CastShadow = false
+		p.Massless = true
+		p.Parent = workspace
+		p.AssemblyLinearVelocity = Vector3.new(rng:NextNumber(-1, 1), rng:NextNumber(0.2, 1.4), rng:NextNumber(-1, 1)).Unit * speed * rng:NextNumber(0.4, 1)
+		p.AssemblyAngularVelocity = Vector3.new(rng:NextNumber(-10, 10), rng:NextNumber(-10, 10), rng:NextNumber(-10, 10))
+		activeBits += 1
+		task.delay(1.6, function()
+			TweenService:Create(p, TweenInfo.new(0.4), { Transparency = 1 }):Play()
+		end)
+		task.delay(2.1, function()
+			activeBits -= 1
+			p:Destroy()
+		end)
+	end
+end
+
+local BLOOD = { Color3.fromRGB(150, 0, 0), Color3.fromRGB(110, 0, 0), Color3.fromRGB(190, 15, 10) }
+local GORE = { Color3.fromRGB(150, 0, 0), Color3.fromRGB(100, 0, 0), Color3.fromRGB(92, 132, 69), Color3.fromRGB(190, 15, 10) }
+local DIRT = { Color3.fromRGB(60, 45, 35), Color3.fromRGB(80, 20, 20), Color3.fromRGB(45, 40, 38) }
+
+local function goreBurst(pos)
+	burst(pos, 26, GORE, 28, 0.32)
+	local a = Instance.new("Attachment")
+	a.WorldPosition = pos
+	a.Parent = workspace.Terrain
+	local l = Instance.new("PointLight")
+	l.Color = Color3.fromRGB(255, 40, 20)
+	l.Range = 12
+	l.Brightness = 4
+	l.Parent = a
+	Debris:AddItem(a, 0.12)
+end
+
+-- camera shake (removed again before the camera scripts run, so it never drifts your aim)
+local lastShake = CFrame.identity
+RunService:BindToRenderStep("ZombieShakeUndo", Enum.RenderPriority.Camera.Value - 1, function()
+	camera.CFrame = camera.CFrame * lastShake:Inverse()
+	lastShake = CFrame.identity
+end)
+
+local headshotLabel = newLabel({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 150, 0.5, -70), Size = UDim2.fromOffset(330, 70), Text = "HEADSHOT!", TextColor3 = Color3.fromRGB(255, 40, 40), Font = horrorFont, Rotation = -8, TextTransparency = 1, TextStrokeTransparency = 1 })
+local headshotScale = Instance.new("UIScale")
+headshotScale.Parent = headshotLabel
+local function headshotPopup()
+	headshotLabel.TextTransparency = 0
+	headshotLabel.TextStrokeTransparency = 0.2
+	headshotScale.Scale = 1.7
+	TweenService:Create(headshotScale, TweenInfo.new(0.18, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	task.delay(0.7, function()
+		TweenService:Create(headshotLabel, TweenInfo.new(0.35), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+	end)
+end
+
+local roundScale = Instance.new("UIScale")
+roundScale.Parent = roundLabel
+local function roundBanner()
+	roundScale.Scale = 2.2
+	TweenService:Create(roundScale, TweenInfo.new(0.9, Enum.EasingStyle.Elastic), { Scale = 1 }):Play()
+	damageOverlay.BackgroundTransparency = 0.55
+	TweenService:Create(damageOverlay, TweenInfo.new(1.2), { BackgroundTransparency = 1 }):Play()
+	addShake(0.6)
+end
+
+---------------------------------------------------------------- zombie walk animation (client-side, via Motor6D.Transform)
+local zombieAnim = {}
+local zombiesFolder = workspace:WaitForChild("Zombies")
+local function trackZombie(model)
+	local root = model:WaitForChild("HumanoidRootPart", 5)
+	if not root then
+		return
+	end
+	local joints = {}
+	for _, n in { "LeftLeg", "RightLeg", "LeftArm", "RightArm", "Head" } do
+		joints[n] = root:WaitForChild(n .. "Joint", 3)
+	end
+	zombieAnim[model] = { root = root, j = joints, phase = rng:NextNumber(0, 6), seed = rng:NextNumber(0, 10) }
+	burst(root.Position - Vector3.new(0, 2.5, 0), 10, DIRT, 14, 0.35) -- spawn dust
+end
+zombiesFolder.ChildAdded:Connect(trackZombie)
+zombiesFolder.ChildRemoved:Connect(function(m)
+	zombieAnim[m] = nil
+end)
+for _, m in zombiesFolder:GetChildren() do
+	task.spawn(trackZombie, m)
+end
+
+local function setJoint(joint, cf)
+	if joint and joint.Parent then
+		joint.Transform = cf
+	end
+end
+
+local function animateZombies(dt)
+	local camPos = camera.CFrame.Position
+	local t = os.clock()
+	for model, a in zombieAnim do
+		local root = a.root
+		if not model.Parent or not root.Parent then
+			zombieAnim[model] = nil
+			continue
+		end
+		local dist = (root.Position - camPos).Magnitude
+		if dist > 160 then
+			continue
+		end
+		local v = root.AssemblyLinearVelocity
+		local speed = Vector3.new(v.X, 0, v.Z).Magnitude
+		local amt = math.clamp(speed / 10, 0, 1)
+		a.phase += dt * (2 + speed * 0.55)
+		local s = math.sin(a.phase)
+		setJoint(a.j.LeftLeg, CFrame.Angles(s * 0.75 * amt, 0, 0))
+		setJoint(a.j.RightLeg, CFrame.Angles(-s * 0.75 * amt, 0, 0))
+		local reach = dist < 8 and (math.sin(t * 9 + a.seed) * 0.35 - 0.25) or 0 -- swipe when close
+		setJoint(a.j.LeftArm, CFrame.Angles(math.sin(t * 2 + a.seed) * 0.12 + s * 0.12 * amt + reach, 0, 0))
+		setJoint(a.j.RightArm, CFrame.Angles(math.sin(t * 2.3 + a.seed) * 0.12 - s * 0.12 * amt - reach, 0, 0))
+		setJoint(a.j.Head, CFrame.Angles(math.sin(t * 1.3 + a.seed) * 0.12, math.sin(t * 0.9 + a.seed) * 0.25, math.sin(t * 1.7 + a.seed) * 0.15))
+	end
+end
+
+---------------------------------------------------------------- flickering fire / pulsing box beam
+local flickerLights, pulseParts = {}, {}
+task.spawn(function()
+	while true do
+		flickerLights, pulseParts = {}, {}
+		local map = workspace:FindFirstChild("ZombieMap")
+		if map then
+			for _, d in map:GetDescendants() do
+				if d:IsA("BasePart") then
+					if d:GetAttribute("Flicker") then
+						for _, l in d:GetDescendants() do
+							if l:IsA("PointLight") then
+								table.insert(flickerLights, l)
+							end
+						end
+					elseif d:GetAttribute("Pulse") then
+						table.insert(pulseParts, d)
+					end
+				end
+			end
+		end
+		task.wait(3)
+	end
+end)
+
 ---------------------------------------------------------------- server events
-EventRemote.OnClientEvent:Connect(function(kind, a, b, c, d)
+EventRemote.OnClientEvent:Connect(function(kind, a, b, c, d, e)
 	if kind == "State" then
 		state = a
 		if state.weapons[state.slot] ~= currentVM then
@@ -464,19 +628,35 @@ EventRemote.OnClientEvent:Connect(function(kind, a, b, c, d)
 		task.delay(0.12, function()
 			hitmarker.Visible = false
 		end)
+		if a and b then
+			headshotPopup()
+		end
 		playSound(Config.Sounds.Hitmarker, 0.4)
 	elseif kind == "Hurt" then
+		addShake(0.9)
 		playSound(Config.Sounds.Hurt, 0.6)
+	elseif kind == "Gore" then
+		if typeof(a) == "Vector3" then
+			goreBurst(a)
+		end
 	elseif kind == "Purchase" then
 		playSound(Config.Sounds.Purchase, 0.6)
 	elseif kind == "RoundStart" then
+		roundBanner()
 		playSound(Config.Sounds.RoundStart, 0.8)
 	elseif kind == "Shot" then
-		-- other players' tracers (a = shooter, b = origin, c = end points, d = weapon)
+		-- a = shooter, b = origin, c = end points, d = weapon, e = blood points
 		if a ~= player and typeof(b) == "Vector3" and type(c) == "table" then
 			local wc = Config.Weapons[d]
 			for _, endPos in c do
 				tracer(b, endPos, wc and wc.TracerColor)
+			end
+		end
+		if type(e) == "table" then
+			for _, pos in e do
+				if typeof(pos) == "Vector3" then
+					burst(pos, 5, BLOOD, 16, 0.22)
+				end
 			end
 		end
 	end
@@ -498,6 +678,26 @@ RunService:BindToRenderStep("ZombieViewmodel", Enum.RenderPriority.Camera.Value 
 	-- sprint
 	if hum then
 		hum.WalkSpeed = (sprinting and not firing) and Config.SprintSpeed or Config.WalkSpeed
+	end
+
+	-- camera shake (undone next frame by ZombieShakeUndo)
+	shake = math.max(shake - dt * 3.5, 0)
+	if shake > 0 then
+		local tt = os.clock() * 40
+		local s = shake * shake * 0.035
+		lastShake = CFrame.Angles(math.noise(tt, 1) * s, math.noise(tt, 2) * s, math.noise(tt, 3) * s * 0.6)
+		camera.CFrame = camera.CFrame * lastShake
+	end
+
+	animateZombies(dt)
+
+	-- fire flicker + beam pulse
+	local tf = os.clock()
+	for i, l in flickerLights do
+		l.Brightness = 2.6 + math.noise(tf * 6, i * 1.7) * 2.2
+	end
+	for _, p in pulseParts do
+		p.Transparency = 0.72 + math.sin(tf * 3) * 0.08
 	end
 
 	-- viewmodel motion

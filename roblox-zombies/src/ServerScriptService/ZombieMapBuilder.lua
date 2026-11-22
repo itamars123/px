@@ -61,6 +61,68 @@ local function lamp(parent, pos)
 	light.Parent = p
 end
 
+local function burningBarrel(parent, pos)
+	local barrel = Instance.new("Part")
+	barrel.Name = "BurningBarrel"
+	barrel.Shape = Enum.PartType.Cylinder
+	barrel.Size = Vector3.new(3.4, 2.6, 2.6)
+	barrel.CFrame = CFrame.new(pos + Vector3.new(0, 1.8, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	barrel.Anchored = true
+	barrel.Color = Color3.fromRGB(60, 45, 35)
+	barrel.Material = Enum.Material.CorrodedMetal
+	barrel.Parent = parent
+
+	local top = Instance.new("Attachment")
+	top.Position = Vector3.new(1.8, 0, 0) -- barrel is rotated: +X is up
+	top.Parent = barrel
+	local fire = Instance.new("Fire")
+	fire.Size = 7
+	fire.Heat = 12
+	fire.Color = Color3.fromRGB(255, 120, 30)
+	fire.SecondaryColor = Color3.fromRGB(255, 40, 0)
+	fire.Parent = top
+	local smoke = Instance.new("Smoke")
+	smoke.Color = Color3.fromRGB(40, 30, 30)
+	smoke.Opacity = 0.15
+	smoke.RiseVelocity = 6
+	smoke.Size = 4
+	smoke.Parent = top
+	local embers = Instance.new("ParticleEmitter")
+	embers.Color = ColorSequence.new(Color3.fromRGB(255, 170, 60), Color3.fromRGB(255, 60, 0))
+	embers.LightEmission = 1
+	embers.Size = NumberSequence.new(0.15, 0)
+	embers.Lifetime = NumberRange.new(1.5, 3)
+	embers.Rate = 25
+	embers.Speed = NumberRange.new(4, 9)
+	embers.SpreadAngle = Vector2.new(25, 25)
+	embers.Acceleration = Vector3.new(0, 2, 0)
+	embers.EmissionDirection = Enum.NormalId.Top
+	embers.Parent = top
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 130, 40)
+	light.Range = 28
+	light.Brightness = 3
+	light.Shadows = true
+	light.Parent = top
+	barrel:SetAttribute("Flicker", true)
+end
+
+local function bloodPool(parent, pos, size)
+	local p = Instance.new("Part")
+	p.Name = "BloodPool"
+	p.Shape = Enum.PartType.Cylinder
+	p.Size = Vector3.new(0.05, size, size)
+	p.CFrame = CFrame.new(pos) * CFrame.Angles(0, math.rad(math.random(0, 180)), math.rad(90))
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.Color = Color3.fromRGB(80, 0, 0)
+	p.Material = Enum.Material.Glass
+	p.Reflectance = 0.1
+	p.Parent = parent
+end
+
 local function zombieSpawn(parent, pos, area)
 	local p = part(parent, "ZombieSpawn", Vector3.new(2, 1, 2), CFrame.new(pos), Color3.fromRGB(255, 0, 0), nil, {
 		Transparency = 1, CanCollide = false, CanQuery = false, CanTouch = false,
@@ -158,10 +220,33 @@ function MapBuilder.Build()
 	box:SetAttribute("Interact", "MysteryBox")
 	label(box, "? MYSTERY BOX ?\n" .. Config.MysteryBoxCost, Color3.fromRGB(120, 200, 255), 3.5)
 	local boxLight = Instance.new("PointLight")
-	boxLight.Range = 14
-	boxLight.Brightness = 3
+	boxLight.Range = 18
+	boxLight.Brightness = 4
 	boxLight.Color = Color3.fromRGB(90, 170, 255)
 	boxLight.Parent = box
+	-- light beam shooting into the sky so you can find the box from anywhere
+	local beam = part(map, "BoxBeam", Vector3.new(60, 3, 3), CFrame.new(18, 33, -93) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(90, 170, 255), Enum.Material.Neon, {
+		Shape = Enum.PartType.Cylinder, Transparency = 0.75, CanCollide = false, CanQuery = false, CanTouch = false, CastShadow = false,
+	})
+	beam:SetAttribute("Pulse", true)
+
+	-- atmosphere: fire barrels, blood, boards on the door
+	burningBarrel(map, Vector3.new(-14, 0.1, 6))
+	burningBarrel(map, Vector3.new(18, 0.1, -12))
+	burningBarrel(map, Vector3.new(-20, 0.1, -80))
+	for _ = 1, 14 do
+		bloodPool(map, Vector3.new(math.random(-35, 35), 0.13, math.random(-35, 35)), math.random(15, 45) / 10)
+	end
+	for _ = 1, 6 do
+		bloodPool(map, Vector3.new(math.random(-25, 25), 0.13, math.random(-95, -45)), math.random(15, 40) / 10)
+	end
+	local b1 = part(door, "Board", Vector3.new(11, 0.8, 0.3), door.CFrame * CFrame.new(-0.3, 2.5, 0.95) * CFrame.Angles(0, 0, 0.45), Color3.fromRGB(80, 55, 32), Enum.Material.WoodPlanks, { CanCollide = false })
+	local b2 = part(door, "Board", Vector3.new(10, 0.8, 0.3), door.CFrame * CFrame.new(0.4, -2.5, 0.95) * CFrame.Angles(0, 0, -0.35), Color3.fromRGB(80, 55, 32), Enum.Material.WoodPlanks, { CanCollide = false })
+	for _, b in { b1, b2 } do
+		local w = Instance.new("WeldConstraint")
+		w.Part0, w.Part1 = door, b
+		w.Parent = b
+	end
 
 	-- Perk machines
 	local function perkMachine(perkId, pos)

@@ -195,6 +195,68 @@ local function lamp(parent, pos)
 	light.Parent = p
 end
 
+local function burningBarrel(parent, pos)
+	local barrel = Instance.new("Part")
+	barrel.Name = "BurningBarrel"
+	barrel.Shape = Enum.PartType.Cylinder
+	barrel.Size = Vector3.new(3.4, 2.6, 2.6)
+	barrel.CFrame = CFrame.new(pos + Vector3.new(0, 1.8, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	barrel.Anchored = true
+	barrel.Color = Color3.fromRGB(60, 45, 35)
+	barrel.Material = Enum.Material.CorrodedMetal
+	barrel.Parent = parent
+
+	local top = Instance.new("Attachment")
+	top.Position = Vector3.new(1.8, 0, 0) -- barrel is rotated: +X is up
+	top.Parent = barrel
+	local fire = Instance.new("Fire")
+	fire.Size = 7
+	fire.Heat = 12
+	fire.Color = Color3.fromRGB(255, 120, 30)
+	fire.SecondaryColor = Color3.fromRGB(255, 40, 0)
+	fire.Parent = top
+	local smoke = Instance.new("Smoke")
+	smoke.Color = Color3.fromRGB(40, 30, 30)
+	smoke.Opacity = 0.15
+	smoke.RiseVelocity = 6
+	smoke.Size = 4
+	smoke.Parent = top
+	local embers = Instance.new("ParticleEmitter")
+	embers.Color = ColorSequence.new(Color3.fromRGB(255, 170, 60), Color3.fromRGB(255, 60, 0))
+	embers.LightEmission = 1
+	embers.Size = NumberSequence.new(0.15, 0)
+	embers.Lifetime = NumberRange.new(1.5, 3)
+	embers.Rate = 25
+	embers.Speed = NumberRange.new(4, 9)
+	embers.SpreadAngle = Vector2.new(25, 25)
+	embers.Acceleration = Vector3.new(0, 2, 0)
+	embers.EmissionDirection = Enum.NormalId.Top
+	embers.Parent = top
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 130, 40)
+	light.Range = 28
+	light.Brightness = 3
+	light.Shadows = true
+	light.Parent = top
+	barrel:SetAttribute("Flicker", true)
+end
+
+local function bloodPool(parent, pos, size)
+	local p = Instance.new("Part")
+	p.Name = "BloodPool"
+	p.Shape = Enum.PartType.Cylinder
+	p.Size = Vector3.new(0.05, size, size)
+	p.CFrame = CFrame.new(pos) * CFrame.Angles(0, math.rad(math.random(0, 180)), math.rad(90))
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.Color = Color3.fromRGB(80, 0, 0)
+	p.Material = Enum.Material.Glass
+	p.Reflectance = 0.1
+	p.Parent = parent
+end
+
 local function zombieSpawn(parent, pos, area)
 	local p = part(parent, "ZombieSpawn", Vector3.new(2, 1, 2), CFrame.new(pos), Color3.fromRGB(255, 0, 0), nil, {
 		Transparency = 1, CanCollide = false, CanQuery = false, CanTouch = false,
@@ -292,10 +354,33 @@ function MapBuilder.Build()
 	box:SetAttribute("Interact", "MysteryBox")
 	label(box, "? MYSTERY BOX ?\n" .. Config.MysteryBoxCost, Color3.fromRGB(120, 200, 255), 3.5)
 	local boxLight = Instance.new("PointLight")
-	boxLight.Range = 14
-	boxLight.Brightness = 3
+	boxLight.Range = 18
+	boxLight.Brightness = 4
 	boxLight.Color = Color3.fromRGB(90, 170, 255)
 	boxLight.Parent = box
+	-- light beam shooting into the sky so you can find the box from anywhere
+	local beam = part(map, "BoxBeam", Vector3.new(60, 3, 3), CFrame.new(18, 33, -93) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(90, 170, 255), Enum.Material.Neon, {
+		Shape = Enum.PartType.Cylinder, Transparency = 0.75, CanCollide = false, CanQuery = false, CanTouch = false, CastShadow = false,
+	})
+	beam:SetAttribute("Pulse", true)
+
+	-- atmosphere: fire barrels, blood, boards on the door
+	burningBarrel(map, Vector3.new(-14, 0.1, 6))
+	burningBarrel(map, Vector3.new(18, 0.1, -12))
+	burningBarrel(map, Vector3.new(-20, 0.1, -80))
+	for _ = 1, 14 do
+		bloodPool(map, Vector3.new(math.random(-35, 35), 0.13, math.random(-35, 35)), math.random(15, 45) / 10)
+	end
+	for _ = 1, 6 do
+		bloodPool(map, Vector3.new(math.random(-25, 25), 0.13, math.random(-95, -45)), math.random(15, 40) / 10)
+	end
+	local b1 = part(door, "Board", Vector3.new(11, 0.8, 0.3), door.CFrame * CFrame.new(-0.3, 2.5, 0.95) * CFrame.Angles(0, 0, 0.45), Color3.fromRGB(80, 55, 32), Enum.Material.WoodPlanks, { CanCollide = false })
+	local b2 = part(door, "Board", Vector3.new(10, 0.8, 0.3), door.CFrame * CFrame.new(0.4, -2.5, 0.95) * CFrame.Angles(0, 0, -0.35), Color3.fromRGB(80, 55, 32), Enum.Material.WoodPlanks, { CanCollide = false })
+	for _, b in { b1, b2 } do
+		local w = Instance.new("WeldConstraint")
+		w.Part0, w.Part1 = door, b
+		w.Parent = b
+	end
 
 	-- Perk machines
 	local function perkMachine(perkId, pos)
@@ -373,13 +458,34 @@ do -- spooky night lighting
 	Lighting.FogColor = Color3.fromRGB(18, 16, 22)
 	Lighting.FogStart = 20
 	Lighting.FogEnd = 170
+	Lighting.FogColor = Color3.fromRGB(28, 6, 8)
 	if not Lighting:FindFirstChildOfClass("Atmosphere") then
 		local atm = Instance.new("Atmosphere")
-		atm.Density = 0.35
-		atm.Color = Color3.fromRGB(80, 70, 90)
-		atm.Decay = Color3.fromRGB(40, 30, 40)
+		atm.Density = 0.38
+		atm.Color = Color3.fromRGB(110, 40, 40)
+		atm.Decay = Color3.fromRGB(60, 10, 15)
+		atm.Glare = 0.4
+		atm.Haze = 1.5
 		atm.Parent = Lighting
 	end
+	-- blood-moon colour grade + glow on neon, eyes, fire and muzzle flashes
+	if not Lighting:FindFirstChild("ZombieGrade") then
+		local cc = Instance.new("ColorCorrectionEffect")
+		cc.Name = "ZombieGrade"
+		cc.TintColor = Color3.fromRGB(255, 225, 215)
+		cc.Contrast = 0.18
+		cc.Saturation = 0.1
+		cc.Parent = Lighting
+		local bloom = Instance.new("BloomEffect")
+		bloom.Intensity = 0.9
+		bloom.Size = 30
+		bloom.Threshold = 0.85
+		bloom.Parent = Lighting
+	end
+	local sky = Lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky")
+	sky.MoonAngularSize = 40 -- giant moon
+	sky.StarCount = 4000
+	sky.Parent = Lighting
 end
 
 local map = workspace:FindFirstChild("ZombieMap") or MapBuilder.Build()
@@ -653,6 +759,19 @@ local function damageZombie(player, model, hum, damage, isHead)
 	if hum.Health <= 0 then
 		if not model:GetAttribute("Killed") then
 			model:SetAttribute("Killed", true)
+			if isHead then
+				-- pop the head off
+				local headPart = model:FindFirstChild("Head")
+				if headPart then
+					EventRemote:FireAllClients("Gore", headPart.Position)
+					for _, name in { "Head", "LeftEye", "RightEye", "Mouth" } do
+						local p = model:FindFirstChild(name)
+						if p then
+							p.Transparency = 1
+						end
+					end
+				end
+			end
 			addPoints(player, isHead and Config.PointsPerHeadshotKill or Config.PointsPerKill)
 			local kills = getStat(player, "Kills")
 			if kills then
@@ -708,7 +827,7 @@ local function onFire(player, st, origin, direction)
 	params.FilterDescendantsInstances = exclude
 
 	local hit, kill, headshot = false, false, false
-	local endPoints = {}
+	local endPoints, bloodPoints = {}, {}
 	for _ = 1, c.Pellets or 1 do
 		local dir = spreadDirection(direction, c.Spread)
 		local result = workspace:Raycast(origin, dir * c.Range, params)
@@ -720,6 +839,7 @@ local function onFire(player, st, origin, direction)
 				local dmg = c.Damage * (isHead and c.HeadshotMultiplier or 1)
 				hit = true
 				headshot = headshot or isHead
+				table.insert(bloodPoints, result.Position)
 				if damageZombie(player, model, hum, dmg, isHead) then
 					kill = true
 				end
@@ -730,7 +850,7 @@ local function onFire(player, st, origin, direction)
 	if hit then
 		EventRemote:FireClient(player, "Hit", kill, headshot)
 	end
-	EventRemote:FireAllClients("Shot", player, origin, endPoints, weapon)
+	EventRemote:FireAllClients("Shot", player, origin, endPoints, weapon, bloodPoints)
 	sendState(player)
 end
 
@@ -953,7 +1073,8 @@ local function buildZombie()
 	root.Parent = model
 	model.PrimaryPart = root
 
-	local function limb(name, size, offset, color, material)
+	-- welded part (no animation): attached rigidly to `base`
+	local function welded(base, name, size, offset, color, material)
 		local p = Instance.new("Part")
 		p.Name = name
 		p.Size = size
@@ -961,24 +1082,51 @@ local function buildZombie()
 		p.Material = material or Enum.Material.SmoothPlastic
 		p.CanCollide = false
 		p.Massless = true
-		p.CFrame = root.CFrame * offset
+		p.CFrame = base.CFrame * offset
 		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = root
+		weld.Part0 = base
 		weld.Part1 = p
 		weld.Parent = p
 		p.Parent = model
 		return p
 	end
 
-	limb("Torso", Vector3.new(2, 2, 1), CFrame.new(), shirt, Enum.Material.Fabric)
-	limb("Head", Vector3.new(1.2, 1.2, 1.2), CFrame.new(0, 1.6, 0) * CFrame.Angles(math.rad(rng:NextNumber(-12, 12)), 0, math.rad(rng:NextNumber(-10, 10))), skin)
-	limb("LeftEye", Vector3.new(0.25, 0.15, 0.1), CFrame.new(-0.25, 1.75, -0.6), Color3.fromRGB(255, 40, 20), Enum.Material.Neon)
-	limb("RightEye", Vector3.new(0.25, 0.15, 0.1), CFrame.new(0.25, 1.75, -0.6), Color3.fromRGB(255, 40, 20), Enum.Material.Neon)
-	-- arms reaching forward
-	limb("LeftArm", Vector3.new(0.9, 0.9, 2.2), CFrame.new(-1.45, 0.6, -0.9), skin)
-	limb("RightArm", Vector3.new(0.9, 0.9, 2.2), CFrame.new(1.45, 0.45, -0.85), skin)
-	limb("LeftLeg", Vector3.new(0.95, 2, 1), CFrame.new(-0.5, -2, 0), pants, Enum.Material.Fabric)
-	limb("RightLeg", Vector3.new(0.95, 2, 1), CFrame.new(0.5, -2, 0), pants, Enum.Material.Fabric)
+	-- jointed limb: a Motor6D the clients animate (walk cycle) through Motor6D.Transform.
+	-- c0 = joint position on the root, c1 = joint position on the limb.
+	local function jointed(name, size, c0, c1, color, material)
+		local p = Instance.new("Part")
+		p.Name = name
+		p.Size = size
+		p.Color = color
+		p.Material = material or Enum.Material.SmoothPlastic
+		p.CanCollide = false
+		p.Massless = true
+		p.CFrame = root.CFrame * c0 * c1:Inverse()
+		local m = Instance.new("Motor6D")
+		m.Name = name .. "Joint"
+		m.Part0 = root
+		m.Part1 = p
+		m.C0 = c0
+		m.C1 = c1
+		m.Parent = root
+		p.Parent = model
+		return p
+	end
+
+	local torso = welded(root, "Torso", Vector3.new(2, 2, 1), CFrame.new(), shirt, Enum.Material.Fabric)
+	welded(torso, "Blood", Vector3.new(rng:NextNumber(0.5, 1), rng:NextNumber(0.5, 1), 0.05), CFrame.new(rng:NextNumber(-0.4, 0.4), rng:NextNumber(-0.4, 0.4), -0.52), Color3.fromRGB(100, 0, 0), Enum.Material.Glass)
+
+	local tilt = CFrame.Angles(math.rad(rng:NextNumber(-18, 8)), math.rad(rng:NextNumber(-15, 15)), math.rad(rng:NextNumber(-15, 15)))
+	local head = jointed("Head", Vector3.new(1.2, 1.2, 1.2), CFrame.new(0, 1, 0) * tilt, CFrame.new(0, -0.6, 0), skin)
+	welded(head, "LeftEye", Vector3.new(0.25, 0.15, 0.1), CFrame.new(-0.25, 0.15, -0.6), Color3.fromRGB(255, 40, 20), Enum.Material.Neon)
+	welded(head, "RightEye", Vector3.new(0.25, 0.15, 0.1), CFrame.new(0.25, 0.15, -0.6), Color3.fromRGB(255, 40, 20), Enum.Material.Neon)
+	welded(head, "Mouth", Vector3.new(0.6, 0.18, 0.08), CFrame.new(0, -0.3, -0.6), Color3.fromRGB(35, 0, 0))
+	-- arms reaching forward (shoulder joint at the back end of the arm)
+	jointed("LeftArm", Vector3.new(0.9, 0.9, 2.2), CFrame.new(-1.45, 0.6, 0.2), CFrame.new(0, 0, 1.1), skin)
+	jointed("RightArm", Vector3.new(0.9, 0.9, 2.2), CFrame.new(1.45, 0.45, 0.25), CFrame.new(0, 0, 1.1), skin)
+	-- legs (hip joint at the top of the leg)
+	jointed("LeftLeg", Vector3.new(0.95, 2, 1), CFrame.new(-0.5, -1, 0), CFrame.new(0, 1, 0), pants, Enum.Material.Fabric)
+	jointed("RightLeg", Vector3.new(0.95, 2, 1), CFrame.new(0.5, -1, 0), CFrame.new(0, 1, 0), pants, Enum.Material.Fabric)
 
 	local hum = Instance.new("Humanoid")
 	hum.RigType = Enum.HumanoidRigType.R15
@@ -1110,9 +1258,12 @@ local function spawnZombie()
 			updateZombiesLeft()
 		end
 		for _, d in model:GetChildren() do
-			if d:IsA("BasePart") and d ~= root then
-				d.CanCollide = true
-				d.Massless = false
+			if d:IsA("BasePart") then
+				d.CanQuery = false -- corpses don't soak up bullets
+				if d ~= root then
+					d.CanCollide = true
+					d.Massless = false
+				end
 			end
 		end
 		Debris:AddItem(model, 4)
@@ -1234,6 +1385,10 @@ local firing, wantShot, sprinting = false, false, false
 local lastShot = 0
 local recoil, reloadBlend, bobBlend = 0, 0, 0
 local currentVM = nil -- weapon name the viewmodel was built for
+local shake = 0 -- camera shake amount
+local function addShake(amount)
+	shake = math.min(shake + amount, 1.2)
+end
 
 ---------------------------------------------------------------- sounds
 local function playSound(id, volume)
@@ -1609,6 +1764,7 @@ local function tryFire()
 	ActionRemote:FireServer("Fire", origin, dir)
 
 	recoil = math.min(recoil + (c.Recoil or 1), 3)
+	addShake(0.18 * (c.Recoil or 1))
 	flashMuzzle()
 	playSound(Config.Sounds.Fire, 0.5)
 
@@ -1657,8 +1813,167 @@ UserInputService.InputChanged:Connect(function(input, processed)
 	switchTo(nextSlot)
 end)
 
+---------------------------------------------------------------- juice: blood, gore, shake, popups
+local activeBits = 0
+local function burst(pos, count, colors, speed, size)
+	if activeBits > 220 then
+		return
+	end
+	for _ = 1, count do
+		local s = size * rng:NextNumber(0.5, 1.3)
+		local p = Instance.new("Part")
+		p.Size = Vector3.new(s, s, s)
+		p.CFrame = CFrame.new(pos) * CFrame.Angles(rng:NextNumber(0, 6), rng:NextNumber(0, 6), 0)
+		p.Color = colors[rng:NextInteger(1, #colors)]
+		p.Material = Enum.Material.SmoothPlastic
+		p.CanQuery = false
+		p.CanTouch = false
+		p.CastShadow = false
+		p.Massless = true
+		p.Parent = workspace
+		p.AssemblyLinearVelocity = Vector3.new(rng:NextNumber(-1, 1), rng:NextNumber(0.2, 1.4), rng:NextNumber(-1, 1)).Unit * speed * rng:NextNumber(0.4, 1)
+		p.AssemblyAngularVelocity = Vector3.new(rng:NextNumber(-10, 10), rng:NextNumber(-10, 10), rng:NextNumber(-10, 10))
+		activeBits += 1
+		task.delay(1.6, function()
+			TweenService:Create(p, TweenInfo.new(0.4), { Transparency = 1 }):Play()
+		end)
+		task.delay(2.1, function()
+			activeBits -= 1
+			p:Destroy()
+		end)
+	end
+end
+
+local BLOOD = { Color3.fromRGB(150, 0, 0), Color3.fromRGB(110, 0, 0), Color3.fromRGB(190, 15, 10) }
+local GORE = { Color3.fromRGB(150, 0, 0), Color3.fromRGB(100, 0, 0), Color3.fromRGB(92, 132, 69), Color3.fromRGB(190, 15, 10) }
+local DIRT = { Color3.fromRGB(60, 45, 35), Color3.fromRGB(80, 20, 20), Color3.fromRGB(45, 40, 38) }
+
+local function goreBurst(pos)
+	burst(pos, 26, GORE, 28, 0.32)
+	local a = Instance.new("Attachment")
+	a.WorldPosition = pos
+	a.Parent = workspace.Terrain
+	local l = Instance.new("PointLight")
+	l.Color = Color3.fromRGB(255, 40, 20)
+	l.Range = 12
+	l.Brightness = 4
+	l.Parent = a
+	Debris:AddItem(a, 0.12)
+end
+
+-- camera shake (removed again before the camera scripts run, so it never drifts your aim)
+local lastShake = CFrame.identity
+RunService:BindToRenderStep("ZombieShakeUndo", Enum.RenderPriority.Camera.Value - 1, function()
+	camera.CFrame = camera.CFrame * lastShake:Inverse()
+	lastShake = CFrame.identity
+end)
+
+local headshotLabel = newLabel({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 150, 0.5, -70), Size = UDim2.fromOffset(330, 70), Text = "HEADSHOT!", TextColor3 = Color3.fromRGB(255, 40, 40), Font = horrorFont, Rotation = -8, TextTransparency = 1, TextStrokeTransparency = 1 })
+local headshotScale = Instance.new("UIScale")
+headshotScale.Parent = headshotLabel
+local function headshotPopup()
+	headshotLabel.TextTransparency = 0
+	headshotLabel.TextStrokeTransparency = 0.2
+	headshotScale.Scale = 1.7
+	TweenService:Create(headshotScale, TweenInfo.new(0.18, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	task.delay(0.7, function()
+		TweenService:Create(headshotLabel, TweenInfo.new(0.35), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+	end)
+end
+
+local roundScale = Instance.new("UIScale")
+roundScale.Parent = roundLabel
+local function roundBanner()
+	roundScale.Scale = 2.2
+	TweenService:Create(roundScale, TweenInfo.new(0.9, Enum.EasingStyle.Elastic), { Scale = 1 }):Play()
+	damageOverlay.BackgroundTransparency = 0.55
+	TweenService:Create(damageOverlay, TweenInfo.new(1.2), { BackgroundTransparency = 1 }):Play()
+	addShake(0.6)
+end
+
+---------------------------------------------------------------- zombie walk animation (client-side, via Motor6D.Transform)
+local zombieAnim = {}
+local zombiesFolder = workspace:WaitForChild("Zombies")
+local function trackZombie(model)
+	local root = model:WaitForChild("HumanoidRootPart", 5)
+	if not root then
+		return
+	end
+	local joints = {}
+	for _, n in { "LeftLeg", "RightLeg", "LeftArm", "RightArm", "Head" } do
+		joints[n] = root:WaitForChild(n .. "Joint", 3)
+	end
+	zombieAnim[model] = { root = root, j = joints, phase = rng:NextNumber(0, 6), seed = rng:NextNumber(0, 10) }
+	burst(root.Position - Vector3.new(0, 2.5, 0), 10, DIRT, 14, 0.35) -- spawn dust
+end
+zombiesFolder.ChildAdded:Connect(trackZombie)
+zombiesFolder.ChildRemoved:Connect(function(m)
+	zombieAnim[m] = nil
+end)
+for _, m in zombiesFolder:GetChildren() do
+	task.spawn(trackZombie, m)
+end
+
+local function setJoint(joint, cf)
+	if joint and joint.Parent then
+		joint.Transform = cf
+	end
+end
+
+local function animateZombies(dt)
+	local camPos = camera.CFrame.Position
+	local t = os.clock()
+	for model, a in zombieAnim do
+		local root = a.root
+		if not model.Parent or not root.Parent then
+			zombieAnim[model] = nil
+			continue
+		end
+		local dist = (root.Position - camPos).Magnitude
+		if dist > 160 then
+			continue
+		end
+		local v = root.AssemblyLinearVelocity
+		local speed = Vector3.new(v.X, 0, v.Z).Magnitude
+		local amt = math.clamp(speed / 10, 0, 1)
+		a.phase += dt * (2 + speed * 0.55)
+		local s = math.sin(a.phase)
+		setJoint(a.j.LeftLeg, CFrame.Angles(s * 0.75 * amt, 0, 0))
+		setJoint(a.j.RightLeg, CFrame.Angles(-s * 0.75 * amt, 0, 0))
+		local reach = dist < 8 and (math.sin(t * 9 + a.seed) * 0.35 - 0.25) or 0 -- swipe when close
+		setJoint(a.j.LeftArm, CFrame.Angles(math.sin(t * 2 + a.seed) * 0.12 + s * 0.12 * amt + reach, 0, 0))
+		setJoint(a.j.RightArm, CFrame.Angles(math.sin(t * 2.3 + a.seed) * 0.12 - s * 0.12 * amt - reach, 0, 0))
+		setJoint(a.j.Head, CFrame.Angles(math.sin(t * 1.3 + a.seed) * 0.12, math.sin(t * 0.9 + a.seed) * 0.25, math.sin(t * 1.7 + a.seed) * 0.15))
+	end
+end
+
+---------------------------------------------------------------- flickering fire / pulsing box beam
+local flickerLights, pulseParts = {}, {}
+task.spawn(function()
+	while true do
+		flickerLights, pulseParts = {}, {}
+		local map = workspace:FindFirstChild("ZombieMap")
+		if map then
+			for _, d in map:GetDescendants() do
+				if d:IsA("BasePart") then
+					if d:GetAttribute("Flicker") then
+						for _, l in d:GetDescendants() do
+							if l:IsA("PointLight") then
+								table.insert(flickerLights, l)
+							end
+						end
+					elseif d:GetAttribute("Pulse") then
+						table.insert(pulseParts, d)
+					end
+				end
+			end
+		end
+		task.wait(3)
+	end
+end)
+
 ---------------------------------------------------------------- server events
-EventRemote.OnClientEvent:Connect(function(kind, a, b, c, d)
+EventRemote.OnClientEvent:Connect(function(kind, a, b, c, d, e)
 	if kind == "State" then
 		state = a
 		if state.weapons[state.slot] ~= currentVM then
@@ -1677,19 +1992,35 @@ EventRemote.OnClientEvent:Connect(function(kind, a, b, c, d)
 		task.delay(0.12, function()
 			hitmarker.Visible = false
 		end)
+		if a and b then
+			headshotPopup()
+		end
 		playSound(Config.Sounds.Hitmarker, 0.4)
 	elseif kind == "Hurt" then
+		addShake(0.9)
 		playSound(Config.Sounds.Hurt, 0.6)
+	elseif kind == "Gore" then
+		if typeof(a) == "Vector3" then
+			goreBurst(a)
+		end
 	elseif kind == "Purchase" then
 		playSound(Config.Sounds.Purchase, 0.6)
 	elseif kind == "RoundStart" then
+		roundBanner()
 		playSound(Config.Sounds.RoundStart, 0.8)
 	elseif kind == "Shot" then
-		-- other players' tracers (a = shooter, b = origin, c = end points, d = weapon)
+		-- a = shooter, b = origin, c = end points, d = weapon, e = blood points
 		if a ~= player and typeof(b) == "Vector3" and type(c) == "table" then
 			local wc = Config.Weapons[d]
 			for _, endPos in c do
 				tracer(b, endPos, wc and wc.TracerColor)
+			end
+		end
+		if type(e) == "table" then
+			for _, pos in e do
+				if typeof(pos) == "Vector3" then
+					burst(pos, 5, BLOOD, 16, 0.22)
+				end
 			end
 		end
 	end
@@ -1711,6 +2042,26 @@ RunService:BindToRenderStep("ZombieViewmodel", Enum.RenderPriority.Camera.Value 
 	-- sprint
 	if hum then
 		hum.WalkSpeed = (sprinting and not firing) and Config.SprintSpeed or Config.WalkSpeed
+	end
+
+	-- camera shake (undone next frame by ZombieShakeUndo)
+	shake = math.max(shake - dt * 3.5, 0)
+	if shake > 0 then
+		local tt = os.clock() * 40
+		local s = shake * shake * 0.035
+		lastShake = CFrame.Angles(math.noise(tt, 1) * s, math.noise(tt, 2) * s, math.noise(tt, 3) * s * 0.6)
+		camera.CFrame = camera.CFrame * lastShake
+	end
+
+	animateZombies(dt)
+
+	-- fire flicker + beam pulse
+	local tf = os.clock()
+	for i, l in flickerLights do
+		l.Brightness = 2.6 + math.noise(tf * 6, i * 1.7) * 2.2
+	end
+	for _, p in pulseParts do
+		p.Transparency = 0.72 + math.sin(tf * 3) * 0.08
 	end
 
 	-- viewmodel motion

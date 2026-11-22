@@ -51,13 +51,34 @@ do -- spooky night lighting
 	Lighting.FogColor = Color3.fromRGB(18, 16, 22)
 	Lighting.FogStart = 20
 	Lighting.FogEnd = 170
+	Lighting.FogColor = Color3.fromRGB(28, 6, 8)
 	if not Lighting:FindFirstChildOfClass("Atmosphere") then
 		local atm = Instance.new("Atmosphere")
-		atm.Density = 0.35
-		atm.Color = Color3.fromRGB(80, 70, 90)
-		atm.Decay = Color3.fromRGB(40, 30, 40)
+		atm.Density = 0.38
+		atm.Color = Color3.fromRGB(110, 40, 40)
+		atm.Decay = Color3.fromRGB(60, 10, 15)
+		atm.Glare = 0.4
+		atm.Haze = 1.5
 		atm.Parent = Lighting
 	end
+	-- blood-moon colour grade + glow on neon, eyes, fire and muzzle flashes
+	if not Lighting:FindFirstChild("ZombieGrade") then
+		local cc = Instance.new("ColorCorrectionEffect")
+		cc.Name = "ZombieGrade"
+		cc.TintColor = Color3.fromRGB(255, 225, 215)
+		cc.Contrast = 0.18
+		cc.Saturation = 0.1
+		cc.Parent = Lighting
+		local bloom = Instance.new("BloomEffect")
+		bloom.Intensity = 0.9
+		bloom.Size = 30
+		bloom.Threshold = 0.85
+		bloom.Parent = Lighting
+	end
+	local sky = Lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky")
+	sky.MoonAngularSize = 40 -- giant moon
+	sky.StarCount = 4000
+	sky.Parent = Lighting
 end
 
 local map = workspace:FindFirstChild("ZombieMap") or MapBuilder.Build()
@@ -331,6 +352,19 @@ local function damageZombie(player, model, hum, damage, isHead)
 	if hum.Health <= 0 then
 		if not model:GetAttribute("Killed") then
 			model:SetAttribute("Killed", true)
+			if isHead then
+				-- pop the head off
+				local headPart = model:FindFirstChild("Head")
+				if headPart then
+					EventRemote:FireAllClients("Gore", headPart.Position)
+					for _, name in { "Head", "LeftEye", "RightEye", "Mouth" } do
+						local p = model:FindFirstChild(name)
+						if p then
+							p.Transparency = 1
+						end
+					end
+				end
+			end
 			addPoints(player, isHead and Config.PointsPerHeadshotKill or Config.PointsPerKill)
 			local kills = getStat(player, "Kills")
 			if kills then
@@ -386,7 +420,7 @@ local function onFire(player, st, origin, direction)
 	params.FilterDescendantsInstances = exclude
 
 	local hit, kill, headshot = false, false, false
-	local endPoints = {}
+	local endPoints, bloodPoints = {}, {}
 	for _ = 1, c.Pellets or 1 do
 		local dir = spreadDirection(direction, c.Spread)
 		local result = workspace:Raycast(origin, dir * c.Range, params)
@@ -398,6 +432,7 @@ local function onFire(player, st, origin, direction)
 				local dmg = c.Damage * (isHead and c.HeadshotMultiplier or 1)
 				hit = true
 				headshot = headshot or isHead
+				table.insert(bloodPoints, result.Position)
 				if damageZombie(player, model, hum, dmg, isHead) then
 					kill = true
 				end
@@ -408,7 +443,7 @@ local function onFire(player, st, origin, direction)
 	if hit then
 		EventRemote:FireClient(player, "Hit", kill, headshot)
 	end
-	EventRemote:FireAllClients("Shot", player, origin, endPoints, weapon)
+	EventRemote:FireAllClients("Shot", player, origin, endPoints, weapon, bloodPoints)
 	sendState(player)
 end
 
@@ -631,7 +666,8 @@ local function buildZombie()
 	root.Parent = model
 	model.PrimaryPart = root
 
-	local function limb(name, size, offset, color, material)
+	-- welded part (no animation): attached rigidly to `base`
+	local function welded(base, name, size, offset, color, material)
 		local p = Instance.new("Part")
 		p.Name = name
 		p.Size = size
@@ -639,24 +675,51 @@ local function buildZombie()
 		p.Material = material or Enum.Material.SmoothPlastic
 		p.CanCollide = false
 		p.Massless = true
-		p.CFrame = root.CFrame * offset
+		p.CFrame = base.CFrame * offset
 		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = root
+		weld.Part0 = base
 		weld.Part1 = p
 		weld.Parent = p
 		p.Parent = model
 		return p
 	end
 
-	limb("Torso", Vector3.new(2, 2, 1), CFrame.new(), shirt, Enum.Material.Fabric)
-	limb("Head", Vector3.new(1.2, 1.2, 1.2), CFrame.new(0, 1.6, 0) * CFrame.Angles(math.rad(rng:NextNumber(-12, 12)), 0, math.rad(rng:NextNumber(-10, 10))), skin)
-	limb("LeftEye", Vector3.new(0.25, 0.15, 0.1), CFrame.new(-0.25, 1.75, -0.6), Color3.fromRGB(255, 40, 20), Enum.Material.Neon)
-	limb("RightEye", Vector3.new(0.25, 0.15, 0.1), CFrame.new(0.25, 1.75, -0.6), Color3.fromRGB(255, 40, 20), Enum.Material.Neon)
-	-- arms reaching forward
-	limb("LeftArm", Vector3.new(0.9, 0.9, 2.2), CFrame.new(-1.45, 0.6, -0.9), skin)
-	limb("RightArm", Vector3.new(0.9, 0.9, 2.2), CFrame.new(1.45, 0.45, -0.85), skin)
-	limb("LeftLeg", Vector3.new(0.95, 2, 1), CFrame.new(-0.5, -2, 0), pants, Enum.Material.Fabric)
-	limb("RightLeg", Vector3.new(0.95, 2, 1), CFrame.new(0.5, -2, 0), pants, Enum.Material.Fabric)
+	-- jointed limb: a Motor6D the clients animate (walk cycle) through Motor6D.Transform.
+	-- c0 = joint position on the root, c1 = joint position on the limb.
+	local function jointed(name, size, c0, c1, color, material)
+		local p = Instance.new("Part")
+		p.Name = name
+		p.Size = size
+		p.Color = color
+		p.Material = material or Enum.Material.SmoothPlastic
+		p.CanCollide = false
+		p.Massless = true
+		p.CFrame = root.CFrame * c0 * c1:Inverse()
+		local m = Instance.new("Motor6D")
+		m.Name = name .. "Joint"
+		m.Part0 = root
+		m.Part1 = p
+		m.C0 = c0
+		m.C1 = c1
+		m.Parent = root
+		p.Parent = model
+		return p
+	end
+
+	local torso = welded(root, "Torso", Vector3.new(2, 2, 1), CFrame.new(), shirt, Enum.Material.Fabric)
+	welded(torso, "Blood", Vector3.new(rng:NextNumber(0.5, 1), rng:NextNumber(0.5, 1), 0.05), CFrame.new(rng:NextNumber(-0.4, 0.4), rng:NextNumber(-0.4, 0.4), -0.52), Color3.fromRGB(100, 0, 0), Enum.Material.Glass)
+
+	local tilt = CFrame.Angles(math.rad(rng:NextNumber(-18, 8)), math.rad(rng:NextNumber(-15, 15)), math.rad(rng:NextNumber(-15, 15)))
+	local head = jointed("Head", Vector3.new(1.2, 1.2, 1.2), CFrame.new(0, 1, 0) * tilt, CFrame.new(0, -0.6, 0), skin)
+	welded(head, "LeftEye", Vector3.new(0.25, 0.15, 0.1), CFrame.new(-0.25, 0.15, -0.6), Color3.fromRGB(255, 40, 20), Enum.Material.Neon)
+	welded(head, "RightEye", Vector3.new(0.25, 0.15, 0.1), CFrame.new(0.25, 0.15, -0.6), Color3.fromRGB(255, 40, 20), Enum.Material.Neon)
+	welded(head, "Mouth", Vector3.new(0.6, 0.18, 0.08), CFrame.new(0, -0.3, -0.6), Color3.fromRGB(35, 0, 0))
+	-- arms reaching forward (shoulder joint at the back end of the arm)
+	jointed("LeftArm", Vector3.new(0.9, 0.9, 2.2), CFrame.new(-1.45, 0.6, 0.2), CFrame.new(0, 0, 1.1), skin)
+	jointed("RightArm", Vector3.new(0.9, 0.9, 2.2), CFrame.new(1.45, 0.45, 0.25), CFrame.new(0, 0, 1.1), skin)
+	-- legs (hip joint at the top of the leg)
+	jointed("LeftLeg", Vector3.new(0.95, 2, 1), CFrame.new(-0.5, -1, 0), CFrame.new(0, 1, 0), pants, Enum.Material.Fabric)
+	jointed("RightLeg", Vector3.new(0.95, 2, 1), CFrame.new(0.5, -1, 0), CFrame.new(0, 1, 0), pants, Enum.Material.Fabric)
 
 	local hum = Instance.new("Humanoid")
 	hum.RigType = Enum.HumanoidRigType.R15
@@ -788,9 +851,12 @@ local function spawnZombie()
 			updateZombiesLeft()
 		end
 		for _, d in model:GetChildren() do
-			if d:IsA("BasePart") and d ~= root then
-				d.CanCollide = true
-				d.Massless = false
+			if d:IsA("BasePart") then
+				d.CanQuery = false -- corpses don't soak up bullets
+				if d ~= root then
+					d.CanCollide = true
+					d.Massless = false
+				end
 			end
 		end
 		Debris:AddItem(model, 4)

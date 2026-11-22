@@ -48,6 +48,15 @@ Test multiplayer: **Test → Clients and Servers → 2 Players → Start**.
 - **Health** regenerates after 4 seconds without being hit. If you go down you lose your guns and perks
   and respawn at the start of the next round. When everyone is down it's game over and the game restarts.
 
+## Effects
+
+- Blood-moon night: red fog, colour grade, bloom glow on eyes, fire and neon, a giant moon.
+- Zombies walk, sway and swipe at you (animated on each player's computer, so the server stays fast).
+- Blocky blood on every hit. Headshot kills pop the head off with a gore burst and a **HEADSHOT!** pop-up.
+- Camera shake when you shoot and when you're hit; the round number slams in with a red flash each round.
+- Burning barrels with flickering firelight and embers, blood pools, a boarded-up door and a light beam
+  over the Mystery Box so you can find it from anywhere.
+
 ## Customise
 
 Everything is in **`ZombieConfig`**: weapon damage/fire rate/ammo/price, zombie health/speed/damage per round,
