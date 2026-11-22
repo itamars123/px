@@ -1,0 +1,526 @@
+-- ZombieClient (LocalScript) — put in StarterPlayer > StarterPlayerScripts
+-- First-person gun viewmodel, shooting input, tracers, HUD (round, points, ammo, health), hitmarkers.
+-- Controls: Mouse1 shoot · R reload · 1/2 or mouse wheel switch gun · Shift sprint · E buy
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Debris = game:GetService("Debris")
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local Config = require(ReplicatedStorage:WaitForChild("ZombieConfig"))
+local ActionRemote = ReplicatedStorage:WaitForChild("ZombieAction")
+local EventRemote = ReplicatedStorage:WaitForChild("ZombieEvent")
+
+local rng = Random.new()
+local state = { weapons = {}, slot = 1, mag = 0, reserve = 0, reloading = false, perks = {} }
+local firing, wantShot, sprinting = false, false, false
+local lastShot = 0
+local recoil, reloadBlend, bobBlend = 0, 0, 0
+local currentVM = nil -- weapon name the viewmodel was built for
+
+---------------------------------------------------------------- sounds
+local function playSound(id, volume)
+	if not id or id == "" then
+		return
+	end
+	local s = Instance.new("Sound")
+	s.SoundId = id
+	s.Volume = volume or 0.6
+	s.Parent = camera
+	s:Play()
+	Debris:AddItem(s, 5)
+end
+
+---------------------------------------------------------------- HUD
+local okFont, horrorFont = pcall(function()
+	return Enum.Font.Creepster
+end)
+if not okFont then
+	horrorFont = Enum.Font.GothamBlack
+end
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "ZombieHUD"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local function newLabel(props)
+	local l = Instance.new("TextLabel")
+	l.BackgroundTransparency = 1
+	l.TextColor3 = Color3.new(1, 1, 1)
+	l.Font = Enum.Font.GothamBlack
+	l.TextScaled = true
+	l.TextStrokeTransparency = 0.3
+	for k, v in props do
+		l[k] = v
+	end
+	l.Parent = props.Parent or gui
+	return l
+end
+
+local function newFrame(props)
+	local f = Instance.new("Frame")
+	f.BorderSizePixel = 0
+	for k, v in props do
+		f[k] = v
+	end
+	f.Parent = props.Parent or gui
+	return f
+end
+
+local damageOverlay = newFrame({ Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(150, 0, 0), BackgroundTransparency = 1, ZIndex = 0 })
+
+local roundLabel = newLabel({ Position = UDim2.fromOffset(24, 14), Size = UDim2.fromOffset(160, 90), Text = "", TextColor3 = Color3.fromRGB(175, 10, 10), Font = horrorFont, TextXAlignment = Enum.TextXAlignment.Left })
+local zombiesLabel = newLabel({ Position = UDim2.fromOffset(26, 104), Size = UDim2.fromOffset(220, 22), Text = "", TextColor3 = Color3.fromRGB(220, 200, 200), TextXAlignment = Enum.TextXAlignment.Left })
+
+local pointsLabel = newLabel({ Position = UDim2.new(0, 24, 1, -118), Size = UDim2.fromOffset(260, 40), Text = "0", TextColor3 = Color3.fromRGB(255, 230, 140), TextXAlignment = Enum.TextXAlignment.Left })
+local perksLabel = newLabel({ Position = UDim2.new(0, 24, 1, -150), Size = UDim2.fromOffset(260, 26), Text = "", RichText = true, TextXAlignment = Enum.TextXAlignment.Left })
+local healthBack = newFrame({ Position = UDim2.new(0, 24, 1, -66), Size = UDim2.fromOffset(260, 14), BackgroundColor3 = Color3.fromRGB(25, 20, 20), BackgroundTransparency = 0.2 })
+local healthFill = newFrame({ Parent = healthBack, Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(70, 200, 80) })
+
+local ammoLabel = newLabel({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -24, 1, -122), Size = UDim2.fromOffset(280, 52), Text = "", TextXAlignment = Enum.TextXAlignment.Right })
+local weaponLabel = newLabel({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -24, 1, -68), Size = UDim2.fromOffset(360, 24), Text = "", RichText = true, TextXAlignment = Enum.TextXAlignment.Right })
+
+local reloadLabel = newLabel({ AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0.5, 40), Size = UDim2.fromOffset(300, 26), Text = "", TextColor3 = Color3.fromRGB(255, 220, 120) })
+local announceLabel = newLabel({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.28), Size = UDim2.fromOffset(820, 90), Text = "", TextTransparency = 1, TextStrokeTransparency = 1 })
+
+-- crosshair: 4 bars around the screen center
+local crossBars = {}
+for i = 1, 4 do
+	crossBars[i] = newFrame({ AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.15 })
+end
+local function layoutCrosshair(gap)
+	crossBars[1].Size, crossBars[1].Position = UDim2.fromOffset(2, 10), UDim2.new(0.5, 0, 0.5, -gap - 5)
+	crossBars[2].Size, crossBars[2].Position = UDim2.fromOffset(2, 10), UDim2.new(0.5, 0, 0.5, gap + 5)
+	crossBars[3].Size, crossBars[3].Position = UDim2.fromOffset(10, 2), UDim2.new(0.5, -gap - 5, 0.5, 0)
+	crossBars[4].Size, crossBars[4].Position = UDim2.fromOffset(10, 2), UDim2.new(0.5, gap + 5, 0.5, 0)
+end
+
+-- hitmarker: an X
+local hitmarker = newFrame({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(26, 26), BackgroundTransparency = 1, Visible = false })
+local hitBars = {}
+for i, rot in { 45, -45 } do
+	hitBars[i] = newFrame({ Parent = hitmarker, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(3, 26), Rotation = rot, BackgroundColor3 = Color3.new(1, 1, 1) })
+end
+
+local announceToken = 0
+local function announce(text, duration)
+	announceToken += 1
+	local token = announceToken
+	announceLabel.Text = text
+	announceLabel.TextTransparency = 0
+	announceLabel.TextStrokeTransparency = 0.2
+	task.delay(duration or 3, function()
+		if token == announceToken then
+			TweenService:Create(announceLabel, TweenInfo.new(0.4), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+		end
+	end)
+end
+
+local function pointsPopup(diff)
+	local l = newLabel({
+		Position = UDim2.new(0, 150, 1, -118), Size = UDim2.fromOffset(120, 30),
+		Text = (diff > 0 and "+" or "") .. diff,
+		TextColor3 = diff > 0 and Color3.fromRGB(255, 230, 140) or Color3.fromRGB(255, 90, 90),
+		TextXAlignment = Enum.TextXAlignment.Left,
+	})
+	TweenService:Create(l, TweenInfo.new(0.8), {
+		Position = UDim2.new(0, 150 + rng:NextInteger(0, 40), 1, -170),
+		TextTransparency = 1, TextStrokeTransparency = 1,
+	}):Play()
+	Debris:AddItem(l, 0.9)
+end
+
+local function updateHUD()
+	local name = state.weapons[state.slot]
+	local c = name and Config.Weapons[name]
+	if c then
+		ammoLabel.Text = state.mag .. "  /  " .. state.reserve
+		ammoLabel.TextColor3 = state.mag == 0 and Color3.fromRGB(255, 80, 80) or Color3.new(1, 1, 1)
+		local parts = {}
+		for i, w in state.weapons do
+			local wc = Config.Weapons[w]
+			local text = "[" .. i .. "] " .. (wc and wc.DisplayName or w)
+			if i == state.slot then
+				text = '<font color="#FFE68C">' .. text .. "</font>"
+			else
+				text = '<font color="#9A9A9A">' .. text .. "</font>"
+			end
+			table.insert(parts, text)
+		end
+		weaponLabel.Text = table.concat(parts, "   ")
+	else
+		ammoLabel.Text = ""
+		weaponLabel.Text = ""
+	end
+
+	if state.reloading then
+		reloadLabel.Text = "RELOADING..."
+	elseif c and state.mag == 0 then
+		reloadLabel.Text = state.reserve > 0 and "PRESS R TO RELOAD" or "NO AMMO — BUY MORE"
+	elseif c and state.mag <= math.ceil(c.MagSize * 0.25) and state.reserve > 0 then
+		reloadLabel.Text = "LOW AMMO"
+	else
+		reloadLabel.Text = ""
+	end
+
+	local perkText = {}
+	for id in state.perks do
+		local p = Config.Perks[id]
+		if p then
+			table.insert(perkText, ('<font color="#%s">■ %s</font>'):format(p.Color:ToHex(), p.DisplayName))
+		end
+	end
+	perksLabel.Text = table.concat(perkText, "  ")
+end
+
+---------------------------------------------------------------- leaderstats / round
+task.spawn(function()
+	local ls = player:WaitForChild("leaderstats")
+	local points = ls:WaitForChild("Points")
+	local last = points.Value
+	pointsLabel.Text = tostring(points.Value)
+	points.Changed:Connect(function(v)
+		pointsLabel.Text = tostring(v)
+		if v ~= last then
+			pointsPopup(v - last)
+		end
+		last = v
+	end)
+end)
+
+local function updateRound()
+	local r = ReplicatedStorage:GetAttribute("Round") or 0
+	roundLabel.Text = r > 0 and tostring(r) or ""
+	local left = ReplicatedStorage:GetAttribute("ZombiesLeft") or 0
+	zombiesLabel.Text = r > 0 and ("Zombies: " .. left) or ""
+end
+ReplicatedStorage:GetAttributeChangedSignal("Round"):Connect(updateRound)
+ReplicatedStorage:GetAttributeChangedSignal("ZombiesLeft"):Connect(updateRound)
+updateRound()
+
+---------------------------------------------------------------- health
+local function getHumanoid()
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if hum and hum.Health > 0 then
+		return hum
+	end
+	return nil
+end
+
+local function onCharacter(char)
+	local hum = char:WaitForChild("Humanoid")
+	local lastHealth = hum.Health
+	local function refresh()
+		local frac = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
+		healthFill.Size = UDim2.fromScale(frac, 1)
+		healthFill.BackgroundColor3 = Color3.fromRGB(220, 50, 40):Lerp(Color3.fromRGB(70, 200, 80), frac)
+		damageOverlay.BackgroundTransparency = 1 - (1 - frac) * 0.45
+		if hum.Health < lastHealth then
+			damageOverlay.BackgroundTransparency = 0.45
+			TweenService:Create(damageOverlay, TweenInfo.new(0.5), { BackgroundTransparency = 1 - (1 - frac) * 0.45 }):Play()
+		end
+		lastHealth = hum.Health
+	end
+	hum.HealthChanged:Connect(refresh)
+	hum:GetPropertyChangedSignal("MaxHealth"):Connect(refresh)
+	refresh()
+	UserInputService.MouseIconEnabled = false
+end
+player.CharacterAdded:Connect(onCharacter)
+if player.Character then
+	task.spawn(onCharacter, player.Character)
+end
+
+---------------------------------------------------------------- viewmodel
+local VM_OFFSET = CFrame.new(0.75, -0.7, -1.5)
+local vmFolder = Instance.new("Folder")
+vmFolder.Name = "Viewmodel"
+vmFolder.Parent = camera
+local vmParts = {} -- { part, offset }
+local muzzle, muzzleLight
+
+local function clearViewmodel()
+	vmFolder:ClearAllChildren()
+	vmParts = {}
+	muzzle, muzzleLight = nil, nil
+end
+
+local function vmPart(name, size, offset, color, material, transparency)
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Size = size
+	p.Color = color
+	p.Material = material or Enum.Material.Metal
+	p.Transparency = transparency or 0
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Parent = vmFolder
+	table.insert(vmParts, { p, offset })
+	return p
+end
+
+local function buildViewmodel(weaponName)
+	clearViewmodel()
+	currentVM = weaponName
+	local c = weaponName and Config.Weapons[weaponName]
+	if not c then
+		return
+	end
+	local L = c.Length or 1.4
+	local bodyMat = c.Neon and Enum.Material.Neon or Enum.Material.Metal
+	local dark = c.Color:Lerp(Color3.new(0, 0, 0), 0.45)
+	vmPart("Body", Vector3.new(0.35, 0.4, L), CFrame.new(), c.Color, bodyMat)
+	vmPart("Barrel", Vector3.new(0.15, 0.15, L * 0.5), CFrame.new(0, 0.08, -L * 0.62), dark)
+	vmPart("Sight", Vector3.new(0.1, 0.12, 0.2), CFrame.new(0, 0.25, -L * 0.3), dark)
+	vmPart("Grip", Vector3.new(0.25, 0.55, 0.3), CFrame.new(0, -0.38, L * 0.28) * CFrame.Angles(math.rad(-15), 0, 0), dark)
+	vmPart("Mag", Vector3.new(0.22, 0.5, 0.3), CFrame.new(0, -0.38, -L * 0.08), dark)
+	local skin = Color3.fromRGB(205, 160, 125)
+	local char = player.Character
+	local bodyColors = char and char:FindFirstChildOfClass("BodyColors")
+	if bodyColors then
+		skin = bodyColors.RightArmColor3
+	end
+	vmPart("Hand", Vector3.new(0.32, 0.32, 1.1), CFrame.new(0.05, -0.45, L * 0.28 + 0.55), skin, Enum.Material.SmoothPlastic)
+	vmPart("Sleeve", Vector3.new(0.4, 0.4, 1.4), CFrame.new(0.05, -0.5, L * 0.28 + 1.6), Color3.fromRGB(45, 50, 40), Enum.Material.Fabric)
+	muzzle = vmPart("Muzzle", Vector3.new(0.35, 0.35, 0.35), CFrame.new(0, 0.08, -L * 0.9), Color3.fromRGB(255, 210, 110), Enum.Material.Neon, 1)
+	muzzleLight = Instance.new("PointLight")
+	muzzleLight.Range = 14
+	muzzleLight.Brightness = 4
+	muzzleLight.Color = Color3.fromRGB(255, 190, 110)
+	muzzleLight.Enabled = false
+	muzzleLight.Parent = muzzle
+end
+
+local function flashMuzzle()
+	if not muzzle then
+		return
+	end
+	muzzle.Transparency = 0.1
+	muzzleLight.Enabled = true
+	task.delay(0.045, function()
+		if muzzle then
+			muzzle.Transparency = 1
+			muzzleLight.Enabled = false
+		end
+	end)
+end
+
+---------------------------------------------------------------- tracers
+local function tracer(from, to, color)
+	local dist = (to - from).Magnitude
+	if dist < 0.5 then
+		return
+	end
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Material = Enum.Material.Neon
+	p.Color = color or Color3.fromRGB(255, 220, 140)
+	p.Transparency = 0.35
+	p.Size = Vector3.new(0.07, 0.07, dist)
+	p.CFrame = CFrame.lookAt((from + to) / 2, to)
+	p.Parent = workspace
+	TweenService:Create(p, TweenInfo.new(0.09), { Transparency = 1 }):Play()
+	Debris:AddItem(p, 0.1)
+end
+
+local function spreadDirection(dir, degrees)
+	if degrees <= 0 then
+		return dir
+	end
+	local cf = CFrame.lookAt(Vector3.zero, dir)
+	local angle = math.rad(degrees) * math.sqrt(rng:NextNumber())
+	return (cf * CFrame.Angles(0, 0, rng:NextNumber() * math.pi * 2) * CFrame.Angles(angle, 0, 0)).LookVector
+end
+
+local rayParams = RaycastParams.new()
+rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+---------------------------------------------------------------- actions
+local lastReloadRequest = 0
+local function requestReload()
+	local c = Config.Weapons[state.weapons[state.slot] or ""]
+	if os.clock() - lastReloadRequest < 0.5 then
+		return
+	end
+	if c and not state.reloading and state.mag < c.MagSize and state.reserve > 0 then
+		lastReloadRequest = os.clock()
+		ActionRemote:FireServer("Reload")
+		playSound(Config.Sounds.Reload, 0.5)
+	end
+end
+
+local function switchTo(slot)
+	if state.weapons[slot] and slot ~= state.slot then
+		ActionRemote:FireServer("Switch", slot)
+	end
+end
+
+-- returns true when the queued shot is "used up" (fired, or impossible)
+local function tryFire()
+	local name = state.weapons[state.slot]
+	local c = name and Config.Weapons[name]
+	if not c or not getHumanoid() then
+		return true
+	end
+	if state.reloading then
+		return false
+	end
+	if state.mag <= 0 then
+		requestReload()
+		return true
+	end
+	local now = os.clock()
+	if now - lastShot < c.FireRate then
+		return false
+	end
+	lastShot = now
+	state.mag -= 1
+	updateHUD()
+
+	local origin = camera.CFrame.Position
+	local dir = camera.CFrame.LookVector
+	ActionRemote:FireServer("Fire", origin, dir)
+
+	recoil = math.min(recoil + (c.Recoil or 1), 3)
+	flashMuzzle()
+	playSound(Config.Sounds.Fire, 0.5)
+
+	rayParams.FilterDescendantsInstances = { player.Character, camera }
+	local from = muzzle and muzzle.Position or origin
+	for _ = 1, c.Pellets or 1 do
+		local d = spreadDirection(dir, c.Spread)
+		local result = workspace:Raycast(origin, d * c.Range, rayParams)
+		tracer(from, result and result.Position or origin + d * c.Range, c.TracerColor)
+	end
+	return true
+end
+
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed then
+		return
+	end
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		firing = true
+		wantShot = true
+	elseif input.KeyCode == Enum.KeyCode.R then
+		requestReload()
+	elseif input.KeyCode == Enum.KeyCode.One then
+		switchTo(1)
+	elseif input.KeyCode == Enum.KeyCode.Two then
+		switchTo(2)
+	elseif input.KeyCode == Enum.KeyCode.LeftShift then
+		sprinting = true
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		firing = false
+	elseif input.KeyCode == Enum.KeyCode.LeftShift then
+		sprinting = false
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input, processed)
+	if processed or input.UserInputType ~= Enum.UserInputType.MouseWheel or #state.weapons < 2 then
+		return
+	end
+	local n = #state.weapons
+	local nextSlot = ((state.slot - 1 + (input.Position.Z > 0 and 1 or -1)) % n) + 1
+	switchTo(nextSlot)
+end)
+
+---------------------------------------------------------------- server events
+EventRemote.OnClientEvent:Connect(function(kind, a, b, c, d)
+	if kind == "State" then
+		state = a
+		if state.weapons[state.slot] ~= currentVM then
+			buildViewmodel(state.weapons[state.slot])
+		end
+		updateHUD()
+	elseif kind == "Announce" then
+		announce(a, b)
+	elseif kind == "Hit" then
+		local color = a and Color3.fromRGB(255, 60, 60) or Color3.new(1, 1, 1)
+		for _, bar in hitBars do
+			bar.BackgroundColor3 = color
+		end
+		hitmarker.Size = UDim2.fromOffset(b and 34 or 26, b and 34 or 26)
+		hitmarker.Visible = true
+		task.delay(0.12, function()
+			hitmarker.Visible = false
+		end)
+		playSound(Config.Sounds.Hitmarker, 0.4)
+	elseif kind == "Hurt" then
+		playSound(Config.Sounds.Hurt, 0.6)
+	elseif kind == "Purchase" then
+		playSound(Config.Sounds.Purchase, 0.6)
+	elseif kind == "RoundStart" then
+		playSound(Config.Sounds.RoundStart, 0.8)
+	elseif kind == "Shot" then
+		-- other players' tracers (a = shooter, b = origin, c = end points, d = weapon)
+		if a ~= player and typeof(b) == "Vector3" and type(c) == "table" then
+			local wc = Config.Weapons[d]
+			for _, endPos in c do
+				tracer(b, endPos, wc and wc.TracerColor)
+			end
+		end
+	end
+end)
+
+---------------------------------------------------------------- per-frame
+RunService:BindToRenderStep("ZombieViewmodel", Enum.RenderPriority.Camera.Value + 1, function(dt)
+	local hum = getHumanoid()
+	local name = state.weapons[state.slot]
+	local c = name and Config.Weapons[name]
+
+	-- shooting
+	if c and (wantShot or (firing and c.Automatic)) then
+		if tryFire() then
+			wantShot = false
+		end
+	end
+
+	-- sprint
+	if hum then
+		hum.WalkSpeed = (sprinting and not firing) and Config.SprintSpeed or Config.WalkSpeed
+	end
+
+	-- viewmodel motion
+	local t = os.clock()
+	recoil += (0 - recoil) * math.min(dt * 14, 1)
+	reloadBlend += ((state.reloading and 1 or 0) - reloadBlend) * math.min(dt * 10, 1)
+	local moving = hum and hum.MoveDirection.Magnitude > 0.1
+	bobBlend += ((moving and (sprinting and 1.8 or 1) or 0) - bobBlend) * math.min(dt * 8, 1)
+	local speed = sprinting and 12 or 8
+	local bob = CFrame.new(math.sin(t * speed) * 0.05 * bobBlend, -math.abs(math.cos(t * speed)) * 0.05 * bobBlend, 0)
+	local recoilCF = CFrame.new(0, 0, recoil * 0.22) * CFrame.Angles(recoil * 0.1, 0, 0)
+	local reloadCF = CFrame.new(0, -0.45 * reloadBlend, 0) * CFrame.Angles(-0.7 * reloadBlend, 0, 0.45 * reloadBlend)
+	local base = camera.CFrame * VM_OFFSET * bob * recoilCF * reloadCF
+
+	vmFolder.Parent = hum and camera or nil
+	for _, entry in vmParts do
+		entry[1].CFrame = base * entry[2]
+	end
+
+	-- crosshair
+	local gap = 6 + (c and c.Spread or 1) * 3 + recoil * 6 + (moving and 6 or 0)
+	layoutCrosshair(gap)
+	for _, bar in crossBars do
+		bar.Visible = hum ~= nil and reloadBlend < 0.5
+	end
+end)
